@@ -48,14 +48,24 @@
             border: 1px solid #666;
             cursor: pointer;
         }
+        #slow-timer, #player-slow-timer {
+            font-size: 16px;
+            min-height: 24px;
+        }
         #mode-toggle:hover { background: #555; }
     </style>
 </head>
 <body>
     <div id="game-row">
-        <div class="side-score" id="score1">0</div>
+        <div class="side-score">
+            <div id="score1">0</div>
+            <div id="player-slow-timer"></div>
+        </div>
         <canvas id="game" width="800" height="500"></canvas>
-        <div class="side-score" id="score2">0</div>
+        <div class="side-score">
+            <div id="score2">0</div>
+            <div id="slow-timer"></div>
+        </div>
     </div>
     <div id="controls">
         <div>Player 1 (Left): W / S &nbsp;|&nbsp; Start: Enter &nbsp;|&nbsp; Pause: Space</div>
@@ -69,6 +79,8 @@
         const score1El = document.getElementById('score1');
         const score2El = document.getElementById('score2');
         const modeBtn = document.getElementById('mode-toggle');
+        const slowTimerEl = document.getElementById('slow-timer');
+        const playerSlowTimerEl = document.getElementById('player-slow-timer');
         const p2Label = document.getElementById('p2-label');
 
         const W = canvas.width;
@@ -90,6 +102,16 @@
         let roundStartTime = 0;
         const ROUND_TIME_LIMIT = 60000; // 1 minute in ms
 
+        const SLOW_COOLDOWN = 10000; // 10 seconds
+        const SLOW_DURATION = 5000; // slow lasts 5 seconds
+        let slowCooldownStart = 0;
+        let aiSlowed = false;
+        let aiSlowedUntil = 0;
+
+        const PLAYER_SLOW_DELAY = 10000; // 10 seconds into round
+        let playerSlowed = false;
+        let playerSlowedUntil = 0;
+
         const TRAIL_MAX = 20;
         const trail = [];
 
@@ -103,6 +125,9 @@
         function resetBall(direction) {
             trail.length = 0;
             roundStartTime = Date.now();
+            slowCooldownStart = Date.now();
+            aiSlowed = false;
+            playerSlowed = false;
             ball.x = W / 2;
             ball.y = H / 2;
             const angle = (Math.random() * Math.PI / 3) - Math.PI / 6; // -30 to +30 deg
@@ -145,16 +170,33 @@
         function update() {
             if (gameOver || paused || waitingToStart) return;
 
+            // Check if player slow should activate or expire
+            if (aiMode && !playerSlowed) {
+                const roundElapsed = Date.now() - roundStartTime;
+                if (roundElapsed >= PLAYER_SLOW_DELAY) {
+                    playerSlowed = true;
+                    playerSlowedUntil = Date.now() + SLOW_DURATION;
+                }
+            }
+            if (playerSlowed && Date.now() >= playerSlowedUntil) {
+                playerSlowed = false;
+            }
+
             // Player 1 movement (W/S)
-            if (keys['w'] || keys['W']) paddle1.y -= PADDLE_SPEED;
-            if (keys['s'] || keys['S']) paddle1.y += PADDLE_SPEED;
+            const p1Speed = PADDLE_SPEED * (playerSlowed ? 0.67 : 1);
+            if (keys['w'] || keys['W']) paddle1.y -= p1Speed;
+            if (keys['s'] || keys['S']) paddle1.y += p1Speed;
             paddle1.y = clamp(paddle1.y, 0, H - PADDLE_H);
 
             // Player 2 / AI movement
             if (aiMode) {
+                // Check if slow has expired
+                if (aiSlowed && Date.now() >= aiSlowedUntil) {
+                    aiSlowed = false;
+                }
                 const center = paddle2.y + PADDLE_H / 2;
                 const diff = ball.y - center;
-                const aiSpeed = PADDLE_SPEED * 0.75;
+                const aiSpeed = PADDLE_SPEED * 0.75 * (aiSlowed ? 0.67 : 1);
                 if (Math.abs(diff) > 10) {
                     paddle2.y += Math.sign(diff) * aiSpeed;
                 }
@@ -295,6 +337,41 @@
             ctx.fillStyle = '#fff';
             ctx.fill();
 
+            // Slow ability timer (AI mode only)
+            if (aiMode && !waitingToStart && !gameOver) {
+                const elapsed = Date.now() - slowCooldownStart;
+                if (aiSlowed) {
+                    slowTimerEl.style.color = '#ff6666';
+                    slowTimerEl.textContent = 'SLOWED';
+                } else if (elapsed >= SLOW_COOLDOWN) {
+                    slowTimerEl.style.color = '#00ff00';
+                    slowTimerEl.textContent = 'READY';
+                } else {
+                    const remaining = Math.ceil((SLOW_COOLDOWN - elapsed) / 1000);
+                    slowTimerEl.style.color = '#888';
+                    slowTimerEl.textContent = remaining + 's';
+                }
+            } else {
+                slowTimerEl.textContent = '';
+            }
+
+            // Player slow timer (AI mode only)
+            if (aiMode && !waitingToStart && !gameOver) {
+                const roundElapsed = Date.now() - roundStartTime;
+                if (playerSlowed) {
+                    playerSlowTimerEl.style.color = '#ff6666';
+                    playerSlowTimerEl.textContent = 'SLOWED';
+                } else if (roundElapsed >= PLAYER_SLOW_DELAY) {
+                    playerSlowTimerEl.textContent = '';
+                } else {
+                    const remaining = Math.ceil((PLAYER_SLOW_DELAY - roundElapsed) / 1000);
+                    playerSlowTimerEl.style.color = '#888';
+                    playerSlowTimerEl.textContent = remaining + 's';
+                }
+            } else {
+                playerSlowTimerEl.textContent = '';
+            }
+
             // Pause overlay
             if (paused && !gameOver) {
                 ctx.fillStyle = 'rgba(0,0,0,0.5)';
@@ -351,6 +428,9 @@
                 if (waitingToStart) {
                     waitingToStart = false;
                     roundStartTime = Date.now();
+                    slowCooldownStart = Date.now();
+                    aiSlowed = false;
+                    playerSlowed = false;
                     // Launch ball from current position, away from the starting player
                     const direction = startingPlayer === 1 ? 1 : -1;
                     const angle = (Math.random() * Math.PI / 3) - Math.PI / 6;
@@ -369,6 +449,14 @@
             }
             if (e.key === 'r' || e.key === 'R') {
                 resetGame();
+            }
+            if (e.key === 'Shift' && aiMode && !waitingToStart && !gameOver && !paused) {
+                const elapsed = Date.now() - slowCooldownStart;
+                if (elapsed >= SLOW_COOLDOWN && !aiSlowed) {
+                    aiSlowed = true;
+                    aiSlowedUntil = Date.now() + SLOW_DURATION;
+                    slowCooldownStart = Date.now();
+                }
             }
             if (['ArrowUp', 'ArrowDown'].includes(e.key)) {
                 e.preventDefault();
