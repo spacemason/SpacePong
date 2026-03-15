@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #111;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #fff;
+            user-select: none;
+        }
+        #scoreboard {
+            font-size: 48px;
+            margin-bottom: 16px;
+            letter-spacing: 24px;
+        }
+        canvas {
+            border: 2px solid #444;
+            display: block;
+        }
+        #controls {
+            margin-top: 16px;
+            font-size: 14px;
+            color: #888;
+            text-align: center;
+            line-height: 1.8;
+        }
+        #mode-toggle {
+            margin-top: 12px;
+            padding: 8px 20px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            background: #333;
+            color: #fff;
+            border: 1px solid #666;
+            cursor: pointer;
+        }
+        #mode-toggle:hover { background: #555; }
+    </style>
+</head>
+<body>
+    <div id="scoreboard"><span id="score1">0</span> <span id="score2">0</span></div>
+    <canvas id="game" width="800" height="500"></canvas>
+    <div id="controls">
+        <div>Player 1 (Left): W / S &nbsp;|&nbsp; Pause: Space</div>
+        <div id="p2-label">Player 2 (Right): Arrow Up / Arrow Down</div>
+        <button id="mode-toggle">Switch to AI Opponent</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const score1El = document.getElementById('score1');
+        const score2El = document.getElementById('score2');
+        const modeBtn = document.getElementById('mode-toggle');
+        const p2Label = document.getElementById('p2-label');
+
+        const W = canvas.width;
+        const H = canvas.height;
+
+        const PADDLE_W = 12;
+        const PADDLE_H = 90;
+        const PADDLE_SPEED = 6;
+        const BALL_SIZE = 10;
+        const BALL_SPEED_INIT = 5;
+        const BALL_SPEED_MAX = 12;
+        const WIN_SCORE = 7;
+
+        let aiMode = false;
+        let gameOver = false;
+        let paused = false;
+
+        const TRAIL_MAX = 20;
+        const trail = [];
+
+        const paddle1 = { x: 20, y: H / 2 - PADDLE_H / 2, w: PADDLE_W, h: PADDLE_H, score: 0 };
+        const paddle2 = { x: W - 20 - PADDLE_W, y: H / 2 - PADDLE_H / 2, w: PADDLE_W, h: PADDLE_H, score: 0 };
+
+        const ball = { x: 0, y: 0, vx: 0, vy: 0 };
+
+        const keys = {};
+
+        function resetBall(direction) {
+            trail.length = 0;
+            ball.x = W / 2;
+            ball.y = H / 2;
+            const angle = (Math.random() * Math.PI / 3) - Math.PI / 6; // -30 to +30 deg
+            const speed = BALL_SPEED_INIT;
+            ball.vx = Math.cos(angle) * speed * direction;
+            ball.vy = Math.sin(angle) * speed;
+        }
+
+        function resetGame() {
+            paddle1.score = 0;
+            paddle2.score = 0;
+            paddle1.y = H / 2 - PADDLE_H / 2;
+            paddle2.y = H / 2 - PADDLE_H / 2;
+            score1El.textContent = '0';
+            score2El.textContent = '0';
+            gameOver = false;
+            resetBall(1);
+        }
+
+        function clamp(val, min, max) {
+            return Math.max(min, Math.min(max, val));
+        }
+
+        function update() {
+            if (gameOver || paused) return;
+
+            // Player 1 movement (W/S)
+            if (keys['w'] || keys['W']) paddle1.y -= PADDLE_SPEED;
+            if (keys['s'] || keys['S']) paddle1.y += PADDLE_SPEED;
+            paddle1.y = clamp(paddle1.y, 0, H - PADDLE_H);
+
+            // Player 2 / AI movement
+            if (aiMode) {
+                const center = paddle2.y + PADDLE_H / 2;
+                const diff = ball.y - center;
+                const aiSpeed = PADDLE_SPEED * 0.75;
+                if (Math.abs(diff) > 10) {
+                    paddle2.y += Math.sign(diff) * aiSpeed;
+                }
+            } else {
+                if (keys['ArrowUp']) paddle2.y -= PADDLE_SPEED;
+                if (keys['ArrowDown']) paddle2.y += PADDLE_SPEED;
+            }
+            paddle2.y = clamp(paddle2.y, 0, H - PADDLE_H);
+
+            // Move ball
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Fire trail
+            trail.push({ x: ball.x, y: ball.y });
+            if (trail.length > TRAIL_MAX) trail.shift();
+
+            // Top/bottom wall bounce
+            if (ball.y - BALL_SIZE / 2 <= 0) {
+                ball.y = BALL_SIZE / 2;
+                ball.vy = Math.abs(ball.vy);
+            }
+            if (ball.y + BALL_SIZE / 2 >= H) {
+                ball.y = H - BALL_SIZE / 2;
+                ball.vy = -Math.abs(ball.vy);
+            }
+
+            // Paddle 1 collision
+            if (ball.vx < 0 &&
+                ball.x - BALL_SIZE / 2 <= paddle1.x + paddle1.w &&
+                ball.x + BALL_SIZE / 2 >= paddle1.x &&
+                ball.y >= paddle1.y &&
+                ball.y <= paddle1.y + paddle1.h) {
+                const hit = (ball.y - (paddle1.y + paddle1.h / 2)) / (paddle1.h / 2);
+                const angle = hit * (Math.PI / 4);
+                const speed = clamp(Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.3, BALL_SPEED_INIT, BALL_SPEED_MAX);
+                ball.vx = Math.cos(angle) * speed;
+                ball.vy = Math.sin(angle) * speed;
+                ball.x = paddle1.x + paddle1.w + BALL_SIZE / 2;
+            }
+
+            // Paddle 2 collision
+            if (ball.vx > 0 &&
+                ball.x + BALL_SIZE / 2 >= paddle2.x &&
+                ball.x - BALL_SIZE / 2 <= paddle2.x + paddle2.w &&
+                ball.y >= paddle2.y &&
+                ball.y <= paddle2.y + paddle2.h) {
+                const hit = (ball.y - (paddle2.y + paddle2.h / 2)) / (paddle2.h / 2);
+                const angle = hit * (Math.PI / 4);
+                const speed = clamp(Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.3, BALL_SPEED_INIT, BALL_SPEED_MAX);
+                ball.vx = -Math.cos(angle) * speed;
+                ball.vy = Math.sin(angle) * speed;
+                ball.x = paddle2.x - BALL_SIZE / 2;
+            }
+
+            // Scoring
+            if (ball.x < 0) {
+                paddle2.score++;
+                score2El.textContent = paddle2.score;
+                if (paddle2.score >= WIN_SCORE) {
+                    gameOver = true;
+                } else {
+                    resetBall(1);
+                }
+            }
+            if (ball.x > W) {
+                paddle1.score++;
+                score1El.textContent = paddle1.score;
+                if (paddle1.score >= WIN_SCORE) {
+                    gameOver = true;
+                } else {
+                    resetBall(-1);
+                }
+            }
+        }
+
+        function draw() {
+            // Background
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, W, H);
+
+            // Center line
+            ctx.setLineDash([10, 10]);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(W / 2, 0);
+            ctx.lineTo(W / 2, H);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Paddles
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(paddle1.x, paddle1.y, paddle1.w, paddle1.h);
+            ctx.fillRect(paddle2.x, paddle2.y, paddle2.w, paddle2.h);
+
+            // Fire trail
+            for (let i = 0; i < trail.length; i++) {
+                const t = i / trail.length; // 0 = oldest, 1 = newest
+                const radius = (BALL_SIZE / 2) * (0.3 + t * 0.7);
+                const alpha = t * 0.8;
+                // Color shifts from dark red -> orange -> yellow
+                const r = 255;
+                const g = Math.floor(60 + t * 180);
+                const b = Math.floor(t * 30);
+                ctx.beginPath();
+                ctx.arc(trail[i].x, trail[i].y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+                ctx.fill();
+            }
+
+            // Ball (bright white-yellow core)
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, BALL_SIZE / 2, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffaa';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, BALL_SIZE / 2 - 2, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+
+            // Pause overlay
+            if (paused && !gameOver) {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect(0, 0, W, H);
+                ctx.fillStyle = '#fff';
+                ctx.font = '48px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('PAUSED', W / 2, H / 2);
+                ctx.font = '20px Courier New';
+                ctx.fillText('Press SPACE to resume', W / 2, H / 2 + 40);
+            }
+
+            // Game over text
+            if (gameOver) {
+                ctx.fillStyle = '#fff';
+                ctx.font = '48px Courier New';
+                ctx.textAlign = 'center';
+                const winner = paddle1.score >= WIN_SCORE ? 'Player 1' : (aiMode ? 'AI' : 'Player 2');
+                ctx.fillText(winner + ' Wins!', W / 2, H / 2 - 20);
+                ctx.font = '20px Courier New';
+                ctx.fillText('Press SPACE to play again', W / 2, H / 2 + 30);
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Input
+        window.addEventListener('keydown', e => {
+            keys[e.key] = true;
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (gameOver) {
+                    resetGame();
+                } else {
+                    paused = !paused;
+                }
+            }
+            if (['ArrowUp', 'ArrowDown'].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+        window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+        // Mode toggle
+        modeBtn.addEventListener('click', () => {
+            aiMode = !aiMode;
+            modeBtn.textContent = aiMode ? 'Switch to 2-Player' : 'Switch to AI Opponent';
+            p2Label.textContent = aiMode ? 'Player 2 (Right): AI Controlled' : 'Player 2 (Right): Arrow Up / Arrow Down';
+            resetGame();
+        });
+
+        // Start
+        resetBall(1);
+        gameLoop();
+    </script>
+</body>
+</html>
