@@ -17,11 +17,6 @@
             color: #fff;
             user-select: none;
         }
-        #scoreboard {
-            font-size: 48px;
-            margin-bottom: 16px;
-            letter-spacing: 24px;
-        }
         canvas {
             border: 2px solid #444;
             display: block;
@@ -47,7 +42,6 @@
     </style>
 </head>
 <body>
-    <div id="scoreboard"><span id="score1">0</span> <span id="score2">0</span></div>
     <canvas id="game" width="800" height="500"></canvas>
     <div id="controls">
         <div>Player 1 (Left): W / S &nbsp;|&nbsp; Start: Enter &nbsp;|&nbsp; Pause: Space</div>
@@ -58,8 +52,6 @@
     <script>
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
-        const score1El = document.getElementById('score1');
-        const score2El = document.getElementById('score2');
         const modeBtn = document.getElementById('mode-toggle');
         const p2Label = document.getElementById('p2-label');
 
@@ -72,7 +64,7 @@
         const BALL_SIZE = 10;
         const BALL_SPEED_INIT = 5;
         const BALL_SPEED_MAX = 12;
-        const WIN_SCORE = 7;
+        const WIN_SCORE = 10;
 
         let aiMode = false;
         let gameOver = false;
@@ -121,8 +113,6 @@
             paddle2.score = 0;
             paddle1.y = H / 2 - PADDLE_H / 2;
             paddle2.y = H / 2 - PADDLE_H / 2;
-            score1El.textContent = '0';
-            score2El.textContent = '0';
             gameOver = false;
             setupWaitingState();
         }
@@ -202,7 +192,6 @@
             // Scoring
             if (ball.x < 0) {
                 paddle2.score++;
-                score2El.textContent = paddle2.score;
                 if (paddle2.score >= WIN_SCORE) {
                     gameOver = true;
                 } else {
@@ -211,7 +200,6 @@
             }
             if (ball.x > W) {
                 paddle1.score++;
-                score1El.textContent = paddle1.score;
                 if (paddle1.score >= WIN_SCORE) {
                     gameOver = true;
                 } else {
@@ -234,6 +222,15 @@
             ctx.lineTo(W / 2, H);
             ctx.stroke();
             ctx.setLineDash([]);
+
+            // Scores behind paddles
+            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            ctx.font = '60px Courier New';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(paddle1.score, paddle1.x + paddle1.w / 2, paddle1.y + paddle1.h / 2);
+            ctx.fillText(paddle2.score, paddle2.x + paddle2.w / 2, paddle2.y + paddle2.h / 2);
+            ctx.textBaseline = 'alphabetic';
 
             // Paddles
             ctx.fillStyle = '#fff';
@@ -295,8 +292,13 @@
                 ctx.fillStyle = '#fff';
                 ctx.font = '48px Courier New';
                 ctx.textAlign = 'center';
-                const winner = paddle1.score >= WIN_SCORE ? 'Player 1' : (aiMode ? 'AI' : 'Player 2');
-                ctx.fillText(winner + ' Wins!', W / 2, H / 2 - 20);
+                const player1Won = paddle1.score >= WIN_SCORE;
+                if (aiMode) {
+                    ctx.fillText(player1Won ? 'YOU WON!' : 'You Lose', W / 2, H / 2 - 20);
+                } else {
+                    const winner = player1Won ? 'Player 1' : 'Player 2';
+                    ctx.fillText(winner + ' Wins!', W / 2, H / 2 - 20);
+                }
                 ctx.font = '20px Courier New';
                 ctx.fillText('Press SPACE to play again', W / 2, H / 2 + 30);
             }
@@ -330,6 +332,9 @@
                 } else if (!waitingToStart) {
                     paused = !paused;
                 }
+            }
+            if (e.key === 'r' || e.key === 'R') {
+                resetGame();
             }
             if (['ArrowUp', 'ArrowDown'].includes(e.key)) {
                 e.preventDefault();
