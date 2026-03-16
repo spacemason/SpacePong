@@ -96,9 +96,78 @@
             font-size: 14px;
             color: #666;
         }
+        #settings {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #555;
+            color: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            z-index: 10;
+            text-align: center;
+            min-width: 280px;
+        }
+        #settings h2 {
+            margin-bottom: 24px;
+            font-size: 28px;
+        }
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+        .toggle {
+            width: 50px;
+            height: 26px;
+            background: #888;
+            border-radius: 13px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.2s;
+        }
+        .toggle.on {
+            background: #4caf50;
+        }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            transition: left 0.2s;
+        }
+        .toggle.on::after {
+            left: 27px;
+        }
+        #settings .hint {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #ccc;
+        }
     </style>
 </head>
 <body>
+    <div id="settings">
+        <h2>Settings</h2>
+        <div class="setting-row">
+            <span>Music</span>
+            <div class="toggle on" id="music-toggle"></div>
+        </div>
+        <div class="setting-row">
+            <span>Background</span>
+            <div class="toggle on" id="bg-toggle"></div>
+        </div>
+        <div class="hint">Press Q to close</div>
+    </div>
     <div id="color-picker">
         <div class="columns">
             <div class="column">
@@ -138,6 +207,9 @@
         const slowTimerEl = document.getElementById('slow-timer');
         const playerSlowTimerEl = document.getElementById('player-slow-timer');
         const colorPickerEl = document.getElementById('color-picker');
+        const settingsEl = document.getElementById('settings');
+        const musicToggle = document.getElementById('music-toggle');
+        const bgToggle = document.getElementById('bg-toggle');
         const p1ColorInput = document.getElementById('p1-color-input');
         const p2ColorInput = document.getElementById('p2-color-input');
         const p2ColorLabel = document.getElementById('p2-color-label');
@@ -158,6 +230,9 @@
         let gameOver = false;
         let paused = false;
         let colorPickerOpen = false;
+        let settingsOpen = false;
+        let musicEnabled = true;
+        let bgEnabled = true;
         let paddle1Color = '#fff';
         let paddle2Color = '#fff';
 
@@ -294,7 +369,7 @@
         }
 
         function update() {
-            if (gameOver || paused || waitingToStart || colorPickerOpen) return;
+            if (gameOver || paused || waitingToStart || colorPickerOpen || settingsOpen) return;
 
             // Update explosion
             if (exploding) {
@@ -379,7 +454,7 @@
                 ball.vx = Math.cos(angle) * speed;
                 ball.vy = Math.sin(angle) * speed;
                 ball.x = paddle1.x + paddle1.w + BALL_SIZE / 2;
-                playLaserSound();
+                if (musicEnabled) playLaserSound();
             }
 
             // Paddle 2 collision
@@ -394,7 +469,7 @@
                 ball.vx = -Math.cos(angle) * speed;
                 ball.vy = Math.sin(angle) * speed;
                 ball.x = paddle2.x - BALL_SIZE / 2;
-                playLaserSound();
+                if (musicEnabled) playLaserSound();
             }
 
             // Round time limit — award point based on ball position
@@ -438,18 +513,20 @@
         }
 
         function draw() {
-            // Space background
-            ctx.fillStyle = '#050510';
+            // Background
+            ctx.fillStyle = bgEnabled ? '#050510' : '#111';
             ctx.fillRect(0, 0, W, H);
 
             // Stars
-            const now = Date.now();
-            for (const s of stars) {
-                const alpha = s.brightness * (0.6 + 0.4 * Math.sin(now * s.twinkleSpeed));
-                ctx.beginPath();
-                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-                ctx.fill();
+            if (bgEnabled) {
+                const now = Date.now();
+                for (const s of stars) {
+                    const alpha = s.brightness * (0.6 + 0.4 * Math.sin(now * s.twinkleSpeed));
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+                    ctx.fill();
+                }
             }
 
             // Center line
@@ -693,6 +770,16 @@
 
         // Input
         window.addEventListener('keydown', e => {
+            // While settings is open, only handle Q to close
+            if (settingsOpen) {
+                if (e.key === 'q' || e.key === 'Q') {
+                    settingsOpen = false;
+                    paused = false;
+                    settingsEl.style.display = 'none';
+                    clearKeys();
+                }
+                return;
+            }
             // While color picker is open, only handle Space to close
             if (colorPickerOpen) {
                 if (e.key === ' ') {
@@ -745,6 +832,13 @@
                 p1ColorInput.focus();
                 return;
             }
+            if ((e.key === 'q' || e.key === 'Q') && !settingsOpen && !colorPickerOpen) {
+                settingsOpen = true;
+                paused = true;
+                settingsEl.style.display = 'block';
+                clearKeys();
+                return;
+            }
             if (e.key === 'r' || e.key === 'R') {
                 resetGame();
             }
@@ -769,6 +863,16 @@
             modeBtn.textContent = aiMode ? 'Switch to 2-Player' : 'Switch to AI Opponent';
             p2Label.textContent = aiMode ? 'Player 2 (Right): AI Controlled' : 'Player 2 (Right): Arrow Up / Arrow Down';
             resetGame();
+        });
+
+        // Settings toggles
+        musicToggle.addEventListener('click', () => {
+            musicEnabled = !musicEnabled;
+            musicToggle.classList.toggle('on', musicEnabled);
+        });
+        bgToggle.addEventListener('click', () => {
+            bgEnabled = !bgEnabled;
+            bgToggle.classList.toggle('on', bgEnabled);
         });
 
         // Start
