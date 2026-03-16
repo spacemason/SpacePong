@@ -328,6 +328,42 @@
             osc2.stop(t + 1.0);
         }
 
+        function playVictorySound() {
+            const t = audioCtx.currentTime;
+            const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
+            notes.forEach((freq, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(freq, t + i * 0.15);
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.setValueAtTime(0.3, t + i * 0.15);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.15 + 0.3);
+                osc.start(t + i * 0.15);
+                osc.stop(t + i * 0.15 + 0.3);
+            });
+        }
+
+        function playSadSound() {
+            const t = audioCtx.currentTime;
+            const notes = [400, 350, 300, 200]; // descending sad tones
+            notes.forEach((freq, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, t + i * 0.25);
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.setValueAtTime(0.3, t + i * 0.25);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.25 + 0.4);
+                osc.start(t + i * 0.25);
+                osc.stop(t + i * 0.25 + 0.4);
+            });
+        }
+
         function startExplosion(x, y, callback) {
             exploding = true;
             explosionStart = Date.now();
@@ -766,6 +802,11 @@
                     const alpha = 1 - elapsed / GAME_OVER_FADE_DURATION;
                     if (alpha <= 0) {
                         gameOverPhase = 2;
+                        if (musicEnabled) {
+                            const player1Won = paddle1.score >= WIN_SCORE;
+                            if (aiMode && player1Won) playVictorySound();
+                            else if (aiMode && !player1Won) playSadSound();
+                        }
                     } else {
                         ctx.globalAlpha = alpha;
                         ctx.fillStyle = '#fff';
