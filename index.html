@@ -160,6 +160,17 @@
         let colorPickerOpen = false;
         let paddle1Color = '#fff';
         let paddle2Color = '#fff';
+
+        // Game over sequence
+        let gameOverPhase = 0; // 0 = not over, 1 = "Game Over!" fading, 2 = show result
+        let gameOverStart = 0;
+        const GAME_OVER_FADE_DURATION = 2000; // 2 seconds for "Game Over!" to fade
+
+        // Explosion state
+        let exploding = false;
+        let explosionParticles = [];
+        let explosionStart = 0;
+        const EXPLOSION_DURATION = 1000; // 1 second
         let waitingToStart = true;
         let startingPlayer = 0;
         let roundStartTime = 0;
@@ -175,6 +186,18 @@
         let playerSlowed = false;
         let playerSlowedUntil = 0;
 
+        // Stars for space background
+        const stars = [];
+        for (let i = 0; i < 150; i++) {
+            stars.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                r: Math.random() * 1.5 + 0.5,
+                brightness: Math.random() * 0.7 + 0.3,
+                twinkleSpeed: Math.random() * 0.02 + 0.005
+            });
+        }
+
         const TRAIL_MAX = 20;
         const trail = [];
 
@@ -184,8 +207,46 @@
         const ball = { x: 0, y: 0, vx: 0, vy: 0 };
 
         const keys = {};
+        function clearKeys() { Object.keys(keys).forEach(k => keys[k] = false); }
+
+        // Audio
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playLaserSound() {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.15);
+        }
+
+        function startExplosion(x, y, callback) {
+            exploding = true;
+            explosionStart = Date.now();
+            explosionParticles = [];
+            for (let i = 0; i < 40; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 4 + 1;
+                explosionParticles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    r: Math.random() * 4 + 2,
+                    color: ['#ff4400', '#ff8800', '#ffcc00', '#fff'][Math.floor(Math.random() * 4)]
+                });
+            }
+            explosionCallback = callback;
+        }
+        let explosionCallback = null;
 
         function resetBall(direction) {
+            clearKeys();
             trail.length = 0;
             roundStartTime = Date.now();
             slowCooldownStart = Date.now();
@@ -216,6 +277,7 @@
         }
 
         function resetGame() {
+            clearKeys();
             paddle1.score = 0;
             paddle2.score = 0;
             score1El.textContent = '0';
@@ -223,6 +285,7 @@
             paddle1.y = H / 2 - PADDLE_H / 2;
             paddle2.y = H / 2 - PADDLE_H / 2;
             gameOver = false;
+            gameOverPhase = 0;
             setupWaitingState();
         }
 
@@ -232,6 +295,23 @@
 
         function update() {
             if (gameOver || paused || waitingToStart || colorPickerOpen) return;
+
+            // Update explosion
+            if (exploding) {
+                for (const p of explosionParticles) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.r *= 0.97;
+                }
+                if (Date.now() - explosionStart >= EXPLOSION_DURATION) {
+                    exploding = false;
+                    if (explosionCallback) {
+                        explosionCallback();
+                        explosionCallback = null;
+                    }
+                }
+                return;
+            }
 
             // Check if player slow should activate or expire
             if (aiMode && !playerSlowed) {
@@ -247,8 +327,8 @@
 
             // Player 1 movement (W/S)
             const p1Speed = PADDLE_SPEED * (playerSlowed ? 0.67 : 1);
-            if (keys['w'] || keys['W']) paddle1.y -= p1Speed;
-            if (keys['s'] || keys['S']) paddle1.y += p1Speed;
+            if (keys['w']) paddle1.y -= p1Speed;
+            if (keys['s']) paddle1.y += p1Speed;
             paddle1.y = clamp(paddle1.y, 0, H - PADDLE_H);
 
             // Player 2 / AI movement
@@ -264,8 +344,8 @@
                     paddle2.y += Math.sign(diff) * aiSpeed;
                 }
             } else {
-                if (keys['ArrowUp']) paddle2.y -= PADDLE_SPEED;
-                if (keys['ArrowDown']) paddle2.y += PADDLE_SPEED;
+                if (keys['arrowup']) paddle2.y -= PADDLE_SPEED;
+                if (keys['arrowdown']) paddle2.y += PADDLE_SPEED;
             }
             paddle2.y = clamp(paddle2.y, 0, H - PADDLE_H);
 
@@ -295,10 +375,11 @@
                 ball.y <= paddle1.y + paddle1.h) {
                 const hit = (ball.y - (paddle1.y + paddle1.h / 2)) / (paddle1.h / 2);
                 const angle = hit * (Math.PI / 4);
-                const speed = clamp(Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.3, BALL_SPEED_INIT, BALL_SPEED_MAX);
+                const speed = clamp(Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.7, BALL_SPEED_INIT, BALL_SPEED_MAX);
                 ball.vx = Math.cos(angle) * speed;
                 ball.vy = Math.sin(angle) * speed;
                 ball.x = paddle1.x + paddle1.w + BALL_SIZE / 2;
+                playLaserSound();
             }
 
             // Paddle 2 collision
@@ -309,28 +390,27 @@
                 ball.y <= paddle2.y + paddle2.h) {
                 const hit = (ball.y - (paddle2.y + paddle2.h / 2)) / (paddle2.h / 2);
                 const angle = hit * (Math.PI / 4);
-                const speed = clamp(Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.3, BALL_SPEED_INIT, BALL_SPEED_MAX);
+                const speed = clamp(Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.7, BALL_SPEED_INIT, BALL_SPEED_MAX);
                 ball.vx = -Math.cos(angle) * speed;
                 ball.vy = Math.sin(angle) * speed;
                 ball.x = paddle2.x - BALL_SIZE / 2;
+                playLaserSound();
             }
 
             // Round time limit — award point based on ball position
             if (Date.now() - roundStartTime >= ROUND_TIME_LIMIT) {
                 if (ball.x < W / 2) {
-                    // Ball on player 1's side — player 2 scores
                     paddle2.score++;
                     score2El.textContent = paddle2.score;
                 } else {
-                    // Ball on player 2's side — player 1 scores
                     paddle1.score++;
                     score1El.textContent = paddle1.score;
                 }
-                if (paddle1.score >= WIN_SCORE || paddle2.score >= WIN_SCORE) {
-                    gameOver = true;
-                } else {
-                    setupWaitingState();
-                }
+                const won = paddle1.score >= WIN_SCORE || paddle2.score >= WIN_SCORE;
+                startExplosion(ball.x, ball.y, () => {
+                    if (won) { gameOver = true; gameOverPhase = 1; gameOverStart = Date.now(); } else { setupWaitingState(); }
+                });
+                ball.vx = 0; ball.vy = 0;
                 return;
             }
 
@@ -339,30 +419,42 @@
                 paddle2.score++;
                 score2El.textContent = paddle2.score;
                 if (paddle2.score >= WIN_SCORE) {
-                    gameOver = true;
+                    startExplosion(ball.x, ball.y, () => { gameOver = true; gameOverPhase = 1; gameOverStart = Date.now(); });
                 } else {
-                    resetBall(1);
+                    startExplosion(ball.x, ball.y, () => { resetBall(1); });
                 }
+                ball.vx = 0; ball.vy = 0;
             }
             if (ball.x > W) {
                 paddle1.score++;
                 score1El.textContent = paddle1.score;
                 if (paddle1.score >= WIN_SCORE) {
-                    gameOver = true;
+                    startExplosion(ball.x, ball.y, () => { gameOver = true; gameOverPhase = 1; gameOverStart = Date.now(); });
                 } else {
-                    resetBall(-1);
+                    startExplosion(ball.x, ball.y, () => { resetBall(-1); });
                 }
+                ball.vx = 0; ball.vy = 0;
             }
         }
 
         function draw() {
-            // Background
-            ctx.fillStyle = '#111';
+            // Space background
+            ctx.fillStyle = '#050510';
             ctx.fillRect(0, 0, W, H);
+
+            // Stars
+            const now = Date.now();
+            for (const s of stars) {
+                const alpha = s.brightness * (0.6 + 0.4 * Math.sin(now * s.twinkleSpeed));
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+                ctx.fill();
+            }
 
             // Center line
             ctx.setLineDash([10, 10]);
-            ctx.strokeStyle = '#333';
+            ctx.strokeStyle = 'rgba(255,255,255,0.15)';
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.moveTo(W / 2, 0);
@@ -376,30 +468,129 @@
             ctx.fillStyle = paddle2Color;
             ctx.fillRect(paddle2.x, paddle2.y, paddle2.w, paddle2.h);
 
+            // Check ball speed stage
+            const ballSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+            const isMeteor = ballSpeed >= BALL_SPEED_MAX - 0.5;
+            const isComet = !isMeteor && ballSpeed >= (BALL_SPEED_INIT + BALL_SPEED_MAX) / 2;
+
             // Fire trail
             for (let i = 0; i < trail.length; i++) {
                 const t = i / trail.length; // 0 = oldest, 1 = newest
-                const radius = (BALL_SIZE / 2) * (0.3 + t * 0.7);
-                const alpha = t * 0.8;
-                // Color shifts from dark red -> orange -> yellow
-                const r = 255;
-                const g = Math.floor(60 + t * 180);
-                const b = Math.floor(t * 30);
+                if (isMeteor) {
+                    // Meteor trail: bigger, more intense
+                    const radius = (BALL_SIZE / 2) * (0.5 + t * 1.2);
+                    const alpha = t * 0.9;
+                    const r = 255;
+                    const g = Math.floor(100 + t * 155);
+                    const b = Math.floor(50 + t * 200);
+                    ctx.beginPath();
+                    ctx.arc(trail[i].x, trail[i].y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+                    ctx.fill();
+                    // Extra ember particles
+                    if (Math.random() < 0.4) {
+                        const ox = (Math.random() - 0.5) * 10;
+                        const oy = (Math.random() - 0.5) * 10;
+                        ctx.beginPath();
+                        ctx.arc(trail[i].x + ox, trail[i].y + oy, Math.random() * 2 + 1, 0, Math.PI * 2);
+                        ctx.fillStyle = `rgba(255,200,50,${alpha * 0.6})`;
+                        ctx.fill();
+                    }
+                } else if (isComet) {
+                    // Comet trail: icy blue-white tail
+                    const radius = (BALL_SIZE / 2) * (0.4 + t * 0.9);
+                    const alpha = t * 0.85;
+                    const r = Math.floor(100 + t * 155);
+                    const g = Math.floor(180 + t * 75);
+                    const b = 255;
+                    ctx.beginPath();
+                    ctx.arc(trail[i].x, trail[i].y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+                    ctx.fill();
+                } else {
+                    const radius = (BALL_SIZE / 2) * (0.3 + t * 0.7);
+                    const alpha = t * 0.8;
+                    // Color shifts from dark red -> orange -> yellow
+                    const r = 255;
+                    const g = Math.floor(60 + t * 180);
+                    const b = Math.floor(t * 30);
+                    ctx.beginPath();
+                    ctx.arc(trail[i].x, trail[i].y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+                    ctx.fill();
+                }
+            }
+
+            // Ball / Comet / Meteor
+            if (isMeteor) {
+                // Outer glow
+                const glow = ctx.createRadialGradient(ball.x, ball.y, 0, ball.x, ball.y, BALL_SIZE * 1.5);
+                glow.addColorStop(0, 'rgba(255,200,100,0.6)');
+                glow.addColorStop(0.5, 'rgba(255,100,0,0.2)');
+                glow.addColorStop(1, 'rgba(255,50,0,0)');
                 ctx.beginPath();
-                ctx.arc(trail[i].x, trail[i].y, radius, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+                ctx.arc(ball.x, ball.y, BALL_SIZE * 1.5, 0, Math.PI * 2);
+                ctx.fillStyle = glow;
+                ctx.fill();
+                // Meteor body
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_SIZE * 0.8, 0, Math.PI * 2);
+                ctx.fillStyle = '#ff6600';
+                ctx.fill();
+                // Hot core
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_SIZE * 0.45, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffcc00';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_SIZE * 0.25, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+            } else if (isComet) {
+                // Icy blue glow
+                const glow = ctx.createRadialGradient(ball.x, ball.y, 0, ball.x, ball.y, BALL_SIZE * 1.2);
+                glow.addColorStop(0, 'rgba(150,200,255,0.5)');
+                glow.addColorStop(0.6, 'rgba(80,150,255,0.15)');
+                glow.addColorStop(1, 'rgba(50,100,255,0)');
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_SIZE * 1.2, 0, Math.PI * 2);
+                ctx.fillStyle = glow;
+                ctx.fill();
+                // Comet body
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_SIZE * 0.6, 0, Math.PI * 2);
+                ctx.fillStyle = '#88ccff';
+                ctx.fill();
+                // Bright core
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_SIZE * 0.3, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+            } else {
+                // Normal ball (bright white-yellow core)
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_SIZE / 2, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffaa';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, BALL_SIZE / 2 - 2, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
                 ctx.fill();
             }
 
-            // Ball (bright white-yellow core)
-            ctx.beginPath();
-            ctx.arc(ball.x, ball.y, BALL_SIZE / 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffaa';
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(ball.x, ball.y, BALL_SIZE / 2 - 2, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
-            ctx.fill();
+            // Explosion particles
+            if (exploding) {
+                const elapsed = Date.now() - explosionStart;
+                const alpha = 1 - elapsed / EXPLOSION_DURATION;
+                for (const p of explosionParticles) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = Math.max(0, alpha);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+            }
 
             // Slow ability timer (AI mode only)
             if (aiMode && !waitingToStart && !gameOver) {
@@ -461,20 +652,36 @@
                 ctx.fillText('Press ENTER to start', W / 2, H / 2 + 30);
             }
 
-            // Game over text
+            // Game over sequence
             if (gameOver) {
-                ctx.fillStyle = '#fff';
-                ctx.font = '48px Courier New';
                 ctx.textAlign = 'center';
-                const player1Won = paddle1.score >= WIN_SCORE;
-                if (aiMode) {
-                    ctx.fillText(player1Won ? 'YOU WON!' : 'You Lose', W / 2, H / 2 - 20);
-                } else {
-                    const winner = player1Won ? 'Player 1' : 'Player 2';
-                    ctx.fillText(winner + ' Wins!', W / 2, H / 2 - 20);
+                if (gameOverPhase === 1) {
+                    // "Game Over!" fading out
+                    const elapsed = Date.now() - gameOverStart;
+                    const alpha = 1 - elapsed / GAME_OVER_FADE_DURATION;
+                    if (alpha <= 0) {
+                        gameOverPhase = 2;
+                    } else {
+                        ctx.globalAlpha = alpha;
+                        ctx.fillStyle = '#fff';
+                        ctx.font = '60px Courier New';
+                        ctx.fillText('Game Over!', W / 2, H / 2);
+                        ctx.globalAlpha = 1;
+                    }
                 }
-                ctx.font = '20px Courier New';
-                ctx.fillText('Press SPACE to play again', W / 2, H / 2 + 30);
+                if (gameOverPhase === 2) {
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '48px Courier New';
+                    const player1Won = paddle1.score >= WIN_SCORE;
+                    if (aiMode) {
+                        ctx.fillText(player1Won ? 'YOU WON!' : 'You Lose', W / 2, H / 2 - 20);
+                    } else {
+                        const winner = player1Won ? 'Player 1' : 'Player 2';
+                        ctx.fillText(winner + ' Wins!', W / 2, H / 2 - 20);
+                    }
+                    ctx.font = '20px Courier New';
+                    ctx.fillText('Press SPACE to play again', W / 2, H / 2 + 30);
+                }
             }
         }
 
@@ -497,14 +704,16 @@
                     colorPickerOpen = false;
                     paused = false;
                     colorPickerEl.style.display = 'none';
+                    clearKeys();
                 }
                 return;
             }
-            keys[e.key] = true;
+            keys[e.key.toLowerCase()] = true;
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (waitingToStart) {
                     waitingToStart = false;
+                    clearKeys();
                     roundStartTime = Date.now();
                     slowCooldownStart = Date.now();
                     aiSlowed = false;
@@ -523,6 +732,7 @@
                     resetGame();
                 } else if (!waitingToStart) {
                     paused = !paused;
+                    if (!paused) clearKeys();
                 }
             }
             if ((e.key === 'e' || e.key === 'E') && !colorPickerOpen && !gameOver) {
@@ -546,11 +756,12 @@
                     slowCooldownStart = Date.now();
                 }
             }
-            if (['ArrowUp', 'ArrowDown'].includes(e.key)) {
+            if (['ArrowUp', 'ArrowDown'].includes(e.key)) { // e.key (not lowered) for browser check
                 e.preventDefault();
             }
         });
-        window.addEventListener('keyup', e => { keys[e.key] = false; });
+        window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+        window.addEventListener('blur', clearKeys);
 
         // Mode toggle
         modeBtn.addEventListener('click', () => {
