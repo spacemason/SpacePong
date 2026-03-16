@@ -300,6 +300,34 @@
             osc.stop(audioCtx.currentTime + 0.15);
         }
 
+        function playGameOverSound() {
+            const t = audioCtx.currentTime;
+            // Deep boom
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.connect(gain1);
+            gain1.connect(audioCtx.destination);
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(150, t);
+            osc1.frequency.exponentialRampToValueAtTime(40, t + 0.8);
+            gain1.gain.setValueAtTime(0.6, t);
+            gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+            osc1.start(t);
+            osc1.stop(t + 0.8);
+            // Descending tone
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.type = 'square';
+            osc2.frequency.setValueAtTime(600, t);
+            osc2.frequency.exponentialRampToValueAtTime(80, t + 1.0);
+            gain2.gain.setValueAtTime(0.3, t);
+            gain2.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+            osc2.start(t);
+            osc2.stop(t + 1.0);
+        }
+
         function startExplosion(x, y, callback) {
             exploding = true;
             explosionStart = Date.now();
@@ -483,7 +511,7 @@
                 }
                 const won = paddle1.score >= WIN_SCORE || paddle2.score >= WIN_SCORE;
                 startExplosion(ball.x, ball.y, () => {
-                    if (won) { gameOver = true; gameOverPhase = 1; gameOverStart = Date.now(); } else { setupWaitingState(); }
+                    if (won) { gameOver = true; gameOverPhase = 1; gameOverStart = Date.now(); if (musicEnabled) playGameOverSound(); } else { setupWaitingState(); }
                 });
                 ball.vx = 0; ball.vy = 0;
                 return;
@@ -494,7 +522,7 @@
                 paddle2.score++;
                 score2El.textContent = paddle2.score;
                 if (paddle2.score >= WIN_SCORE) {
-                    startExplosion(ball.x, ball.y, () => { gameOver = true; gameOverPhase = 1; gameOverStart = Date.now(); });
+                    startExplosion(ball.x, ball.y, () => { gameOver = true; gameOverPhase = 1; gameOverStart = Date.now(); if (musicEnabled) playGameOverSound(); });
                 } else {
                     startExplosion(ball.x, ball.y, () => { resetBall(1); });
                 }
@@ -504,7 +532,7 @@
                 paddle1.score++;
                 score1El.textContent = paddle1.score;
                 if (paddle1.score >= WIN_SCORE) {
-                    startExplosion(ball.x, ball.y, () => { gameOver = true; gameOverPhase = 1; gameOverStart = Date.now(); });
+                    startExplosion(ball.x, ball.y, () => { gameOver = true; gameOverPhase = 1; gameOverStart = Date.now(); if (musicEnabled) playGameOverSound(); });
                 } else {
                     startExplosion(ball.x, ball.y, () => { resetBall(-1); });
                 }
