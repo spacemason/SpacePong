@@ -38,21 +38,10 @@
             text-align: center;
             line-height: 1.8;
         }
-        #mode-toggle {
-            margin-top: 12px;
-            padding: 8px 20px;
-            font-size: 16px;
-            font-family: 'Courier New', monospace;
-            background: #333;
-            color: #fff;
-            border: 1px solid #666;
-            cursor: pointer;
-        }
         #slow-timer, #player-slow-timer {
             font-size: 16px;
             min-height: 24px;
         }
-        #mode-toggle:hover { background: #555; }
         #color-picker {
             display: none;
             position: absolute;
@@ -95,6 +84,46 @@
             margin-top: 20px;
             font-size: 14px;
             color: #666;
+        }
+        #mode-select {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+        #mode-select .box {
+            background: #fff;
+            color: #000;
+            padding: 50px 60px;
+            border-radius: 16px;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+        }
+        #mode-select h1 {
+            font-size: 36px;
+            margin-bottom: 30px;
+        }
+        #mode-select .mode-btn {
+            display: block;
+            width: 100%;
+            padding: 16px 40px;
+            margin-bottom: 16px;
+            font-size: 22px;
+            font-family: 'Courier New', monospace;
+            background: #333;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #mode-select .mode-btn:hover {
+            background: #555;
         }
         #settings {
             display: none;
@@ -156,6 +185,13 @@
     </style>
 </head>
 <body>
+    <div id="mode-select">
+        <div class="box">
+            <h1>Game Modes</h1>
+            <button class="mode-btn" id="mode-ai">1 Player and AI</button>
+            <button class="mode-btn" id="mode-2p">2 Players</button>
+        </div>
+    </div>
     <div id="settings">
         <h2>Settings</h2>
         <div class="setting-row">
@@ -195,7 +231,6 @@
     <div id="controls">
         <div>Player 1 (Left): W / S &nbsp;|&nbsp; Start: Enter &nbsp;|&nbsp; Pause: Space</div>
         <div id="p2-label">Player 2 (Right): Arrow Up / Arrow Down</div>
-        <button id="mode-toggle">Switch to AI Opponent</button>
     </div>
 
     <script>
@@ -203,7 +238,9 @@
         const ctx = canvas.getContext('2d');
         const score1El = document.getElementById('score1');
         const score2El = document.getElementById('score2');
-        const modeBtn = document.getElementById('mode-toggle');
+        const modeSelectEl = document.getElementById('mode-select');
+        const modeAiBtn = document.getElementById('mode-ai');
+        const mode2pBtn = document.getElementById('mode-2p');
         const slowTimerEl = document.getElementById('slow-timer');
         const playerSlowTimerEl = document.getElementById('player-slow-timer');
         const colorPickerEl = document.getElementById('color-picker');
@@ -227,6 +264,7 @@
         const WIN_SCORE = 10;
 
         let aiMode = false;
+        let modeSelected = false;
         let gameOver = false;
         let paused = false;
         let colorPickerOpen = false;
@@ -867,6 +905,14 @@
 
         // Input
         window.addEventListener('keydown', e => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                modeSelected = false;
+                modeSelectEl.style.display = 'flex';
+                clearKeys();
+                return;
+            }
+            if (!modeSelected) return;
             // While settings is open, only handle Q to close
             if (settingsOpen) {
                 if (e.key === 'q' || e.key === 'Q') {
@@ -944,13 +990,16 @@
         window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
         window.addEventListener('blur', clearKeys);
 
-        // Mode toggle
-        modeBtn.addEventListener('click', () => {
-            aiMode = !aiMode;
-            modeBtn.textContent = aiMode ? 'Switch to 2-Player' : 'Switch to AI Opponent';
+        // Mode select
+        function selectMode(isAi) {
+            aiMode = isAi;
+            modeSelected = true;
             p2Label.textContent = aiMode ? 'Player 2 (Right): AI Controlled' : 'Player 2 (Right): Arrow Up / Arrow Down';
+            modeSelectEl.style.display = 'none';
             resetGame();
-        });
+        }
+        modeAiBtn.addEventListener('click', () => selectMode(true));
+        mode2pBtn.addEventListener('click', () => selectMode(false));
 
         // Settings toggles
         musicToggle.addEventListener('click', () => {
