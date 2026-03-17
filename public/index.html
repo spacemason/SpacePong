@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Mode Selection Overlay -->
+    <div id="mode-select">
+        <div class="box">
+            <h1>Game Modes</h1>
+            <button class="mode-btn" id="mode-ai">1 Player and AI</button>
+            <button class="mode-btn" id="mode-2p">2 Players</button>
+            <button class="mode-btn mode-btn-online" id="mode-online">Online Play</button>
+        </div>
+    </div>
+
+    <!-- Username Entry Modal -->
+    <div id="username-modal">
+        <div class="box">
+            <h1>Enter Username</h1>
+            <input type="text" id="username-input" placeholder="Username" maxlength="16" autocomplete="off">
+            <div id="username-error" class="username-error"></div>
+            <button class="mode-btn" id="username-join-btn">Join</button>
+        </div>
+    </div>
+
+    <!-- Lobby Screen (populated by LobbyUI.init()) -->
+    <div id="lobby-screen"></div>
+
+    <!-- Game Screen (shared by local and online) -->
+    <div id="game-screen">
+        <div id="game-row">
+            <div class="side-score">
+                <div id="score1">0</div>
+                <div id="player-slow-timer"></div>
+            </div>
+            <canvas id="game" width="800" height="500"></canvas>
+            <div class="side-score">
+                <div id="score2">0</div>
+                <div id="slow-timer"></div>
+            </div>
+        </div>
+        <div id="controls">
+            <div>Player 1 (Left): W / S &nbsp;|&nbsp; Start: Enter &nbsp;|&nbsp; Pause: Space</div>
+            <div id="p2-label">Player 2 (Right): Arrow Up / Arrow Down</div>
+        </div>
+    </div>
+
+    <!-- Color Picker Overlay -->
+    <div id="color-picker">
+        <div class="columns">
+            <div class="column">
+                <label>Player 1's Paddle Color</label>
+                <input type="text" id="p1-color-input" placeholder="e.g. red">
+            </div>
+            <div class="column">
+                <label id="p2-color-label">Player 2's Paddle Color</label>
+                <input type="text" id="p2-color-input" placeholder="e.g. blue">
+            </div>
+        </div>
+        <div class="hint">Press SPACE to continue</div>
+    </div>
+
+    <!-- Settings Overlay -->
+    <div id="settings">
+        <h2>Settings</h2>
+        <div class="setting-row">
+            <span>Music</span>
+            <div class="toggle on" id="music-toggle"></div>
+        </div>
+        <div class="setting-row">
+            <span>Background</span>
+            <div class="toggle on" id="bg-toggle"></div>
+        </div>
+        <div class="hint">Press Q to close</div>
+    </div>
+
+    <!-- Scripts (order matters) -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/constants.js"></script>
+    <script src="/js/audio.js"></script>
+    <script src="/js/renderer.js"></script>
+    <script src="/js/network.js"></script>
+    <script src="/js/lobbyUI.js"></script>
+    <script src="/js/localGame.js"></script>
+    <script src="/js/onlineGame.js"></script>
+    <script src="/js/main.js"></script>
+</body>
+</html>

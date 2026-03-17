@@ -1,0 +1,22 @@
+{
+  "[object Object]": {
+    "username": {
+      "username": "SpaceMason"
+    },
+    "wins": 0,
+    "losses": 0,
+    "gamesPlayed": 0
+  },
+  "SpaceMason": {
+    "username": "SpaceMason",
+    "wins": 0,
+    "losses": 0,
+    "gamesPlayed": 0
+  },
+  "Daddy": {
+    "username": "Daddy",
+    "wins": 0,
+    "losses": 0,
+    "gamesPlayed": 0
+  }
+}

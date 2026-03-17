@@ -468,6 +468,13 @@
             paddle2.y = H / 2 - PADDLE_H / 2;
             gameOver = false;
             gameOverPhase = 0;
+            paused = false;
+            exploding = false;
+            countingDown = false;
+            colorPickerOpen = false;
+            settingsOpen = false;
+            colorPickerEl.style.display = 'none';
+            settingsEl.style.display = 'none';
             setupWaitingState();
         }
 
@@ -905,14 +912,22 @@
 
         // Input
         window.addEventListener('keydown', e => {
-            if (e.key === 'Tab') {
+            if (!modeSelected) {
+                if (e.key === 'b' || e.key === 'B') {
+                    modeSelected = true;
+                    modeSelectEl.style.display = 'none';
+                    clearKeys();
+                }
+                return;
+            }
+            if (e.key === 'Control') {
                 e.preventDefault();
                 modeSelected = false;
+                paused = true;
                 modeSelectEl.style.display = 'flex';
                 clearKeys();
                 return;
             }
-            if (!modeSelected) return;
             // While settings is open, only handle Q to close
             if (settingsOpen) {
                 if (e.key === 'q' || e.key === 'Q') {
