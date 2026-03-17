@@ -236,6 +236,11 @@
         let paddle1Color = '#fff';
         let paddle2Color = '#fff';
 
+        // Countdown state
+        let countingDown = false;
+        let countdownStart = 0;
+        const COUNTDOWN_DURATION = 3000; // 3 seconds
+
         // Game over sequence
         let gameOverPhase = 0; // 0 = not over, 1 = "Game Over!" fading, 2 = show result
         let gameOverStart = 0;
@@ -339,7 +344,7 @@
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(freq, t + i * 0.15);
                 gain.gain.setValueAtTime(0, t);
-                gain.gain.setValueAtTime(0.3, t + i * 0.15);
+                gain.gain.setValueAtTime(1.0, t + i * 0.15);
                 gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.15 + 0.3);
                 osc.start(t + i * 0.15);
                 osc.stop(t + i * 0.15 + 0.3);
@@ -357,7 +362,7 @@
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(freq, t + i * 0.25);
                 gain.gain.setValueAtTime(0, t);
-                gain.gain.setValueAtTime(0.3, t + i * 0.25);
+                gain.gain.setValueAtTime(1.0, t + i * 0.25);
                 gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.25 + 0.4);
                 osc.start(t + i * 0.25);
                 osc.stop(t + i * 0.25 + 0.4);
@@ -785,12 +790,35 @@
                 ctx.fillStyle = 'rgba(0,0,0,0.5)';
                 ctx.fillRect(0, 0, W, H);
                 ctx.fillStyle = '#fff';
-                ctx.font = '36px Courier New';
                 ctx.textAlign = 'center';
-                const name = startingPlayer === 1 ? 'Player 1' : (aiMode ? 'AI' : 'Player 2');
-                ctx.fillText(name + ' starts with the ball', W / 2, H / 2 - 20);
-                ctx.font = '20px Courier New';
-                ctx.fillText('Press ENTER to start', W / 2, H / 2 + 30);
+                if (countingDown) {
+                    const elapsed = Date.now() - countdownStart;
+                    const remaining = Math.ceil((COUNTDOWN_DURATION - elapsed) / 1000);
+                    if (remaining <= 0) {
+                        // Countdown done — launch ball
+                        countingDown = false;
+                        waitingToStart = false;
+                        clearKeys();
+                        roundStartTime = Date.now();
+                        slowCooldownStart = Date.now();
+                        aiSlowed = false;
+                        playerSlowed = false;
+                        const direction = startingPlayer === 1 ? 1 : -1;
+                        const angle = (Math.random() * Math.PI / 3) - Math.PI / 6;
+                        const speed = BALL_SPEED_INIT;
+                        ball.vx = Math.cos(angle) * speed * direction;
+                        ball.vy = Math.sin(angle) * speed;
+                    } else {
+                        ctx.font = '120px Courier New';
+                        ctx.fillText(remaining, W / 2, H / 2 + 40);
+                    }
+                } else {
+                    ctx.font = '36px Courier New';
+                    const name = startingPlayer === 1 ? 'Player 1' : (aiMode ? 'AI' : 'Player 2');
+                    ctx.fillText(name + ' starts with the ball', W / 2, H / 2 - 20);
+                    ctx.font = '20px Courier New';
+                    ctx.fillText('Press ENTER to start', W / 2, H / 2 + 30);
+                }
             }
 
             // Game over sequence
@@ -867,19 +895,9 @@
             keys[e.key.toLowerCase()] = true;
             if (e.key === 'Enter') {
                 e.preventDefault();
-                if (waitingToStart) {
-                    waitingToStart = false;
-                    clearKeys();
-                    roundStartTime = Date.now();
-                    slowCooldownStart = Date.now();
-                    aiSlowed = false;
-                    playerSlowed = false;
-                    // Launch ball from current position, away from the starting player
-                    const direction = startingPlayer === 1 ? 1 : -1;
-                    const angle = (Math.random() * Math.PI / 3) - Math.PI / 6;
-                    const speed = BALL_SPEED_INIT;
-                    ball.vx = Math.cos(angle) * speed * direction;
-                    ball.vy = Math.sin(angle) * speed;
+                if (waitingToStart && !countingDown) {
+                    countingDown = true;
+                    countdownStart = Date.now();
                 }
             }
             if (e.key === ' ') {
