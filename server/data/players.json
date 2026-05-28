@@ -18,5 +18,11 @@
     "wins": 0,
     "losses": 0,
     "gamesPlayed": 0
+  },
+  "Padington": {
+    "username": "Padington",
+    "wins": 0,
+    "losses": 0,
+    "gamesPlayed": 0
   }
 }

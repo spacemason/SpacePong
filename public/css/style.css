@@ -1,5 +1,7 @@
+/* Reset — removes all the default spacing so we start from scratch */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Body — the whole page background, centered and dark like an arcade */
 body {
     background: #111;
     display: flex;
@@ -10,9 +12,11 @@ body {
     font-family: 'Courier New', monospace;
     color: #fff;
     user-select: none;
+    overflow: hidden;
+    touch-action: none;
 }
 
-/* Game screen */
+/* Game screen — the area that holds the canvas, scores, and controls */
 #game-screen {
     display: none;
     flex-direction: column;
@@ -20,23 +24,27 @@ body {
     justify-content: center;
 }
 
+/* Game row — puts the scores and canvas side by side */
 #game-row {
     display: flex;
     align-items: center;
     gap: 24px;
 }
 
+/* Side scores — the big numbers on each side of the game */
 .side-score {
     font-size: 64px;
     min-width: 60px;
     text-align: center;
 }
 
+/* Canvas — the playing field where the ball bounces around */
 canvas {
     border: 2px solid #444;
     display: block;
 }
 
+/* Controls text — tells you which keys to press */
 #controls {
     margin-top: 16px;
     font-size: 14px;
@@ -45,12 +53,13 @@ canvas {
     line-height: 1.8;
 }
 
+/* Slow timer — shows a countdown when your paddle is slowed down */
 #slow-timer, #player-slow-timer {
     font-size: 16px;
     min-height: 24px;
 }
 
-/* Color Picker */
+/* Color Picker — a popup where you type in paddle colors for local games */
 #color-picker {
     display: none;
     position: absolute;
@@ -100,7 +109,7 @@ canvas {
     color: #666;
 }
 
-/* Mode Select Overlay */
+/* Mode Select Overlay — the main menu that covers the whole screen */
 #mode-select {
     position: absolute;
     top: 0;
@@ -114,6 +123,7 @@ canvas {
     z-index: 20;
 }
 
+/* The white box in the center of the menu and username screens */
 #mode-select .box,
 #username-modal .box {
     background: #fff;
@@ -130,6 +140,7 @@ canvas {
     margin-bottom: 30px;
 }
 
+/* The big clickable buttons on the menu and username screens */
 #mode-select .mode-btn,
 #username-modal .mode-btn {
     display: block;
@@ -150,6 +161,7 @@ canvas {
     background: #555;
 }
 
+/* The "Online Play" button gets a special green color to stand out */
 #mode-select .mode-btn-online {
     background: #2a5;
 }
@@ -158,7 +170,7 @@ canvas {
     background: #3b7;
 }
 
-/* Username Modal */
+/* Username Modal — the popup where you type your online name */
 #username-modal {
     position: absolute;
     top: 0;
@@ -189,6 +201,60 @@ canvas {
     border-color: #2a5;
 }
 
+/* Online Color Modal — the popup where you pick your paddle color */
+#online-color-modal {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+}
+
+.color-swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 3px solid transparent;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+}
+
+.color-swatch:hover {
+    transform: scale(1.1);
+}
+
+.color-swatch.selected {
+    border-color: #fff;
+    transform: scale(1.15);
+}
+
+#online-color-modal input[type="color"] {
+    display: block;
+    width: 120px;
+    height: 120px;
+    margin: 0 auto;
+    padding: 0;
+    border: 3px solid #888;
+    border-radius: 12px;
+    cursor: pointer;
+    background: none;
+}
+
+#online-color-modal input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 4px;
+}
+
+#online-color-modal input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 8px;
+}
+
+/* Error message that shows up in red if your username is not valid */
 .username-error {
     color: #c33;
     font-size: 14px;
@@ -197,7 +263,7 @@ canvas {
     font-family: 'Courier New', monospace;
 }
 
-/* Settings Overlay */
+/* Settings Overlay — a popup to turn music and background on or off */
 #settings {
     display: none;
     position: absolute;
@@ -219,6 +285,7 @@ canvas {
     font-size: 28px;
 }
 
+/* Each setting row — label on the left, toggle switch on the right */
 .setting-row {
     display: flex;
     justify-content: space-between;
@@ -227,6 +294,7 @@ canvas {
     font-size: 18px;
 }
 
+/* Toggle switch — a little slider that turns things on and off */
 .toggle {
     width: 50px;
     height: 26px;
@@ -237,10 +305,12 @@ canvas {
     transition: background 0.2s;
 }
 
+/* When the toggle is ON, it turns green */
 .toggle.on {
     background: #4caf50;
 }
 
+/* The white circle that slides back and forth inside the toggle */
 .toggle::after {
     content: '';
     position: absolute;
@@ -263,7 +333,82 @@ canvas {
     color: #ccc;
 }
 
-/* Lobby screen is hidden by default; LobbyUI manages its own visibility */
+/* Lobby screen — hidden by default; JavaScript shows it when you go online */
 #lobby-screen {
     display: none;
+}
+
+/* Touch controls — buttons that appear on phones and tablets instead of keyboard */
+#touch-controls {
+    display: none;
+    margin-top: 12px;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* Each touch button — styled to look nice and be easy to tap */
+.touch-btn {
+    padding: 12px 20px;
+    font-size: 16px;
+    font-family: 'Courier New', monospace;
+    background: #333;
+    color: #fff;
+    border: 2px solid #666;
+    border-radius: 8px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+}
+
+.touch-btn:active, .touch-btn.active {
+    background: #555;
+    border-color: #aaa;
+}
+
+/* Special "slow" button — has an orange color to look different */
+.touch-btn-slow {
+    background: #553300;
+    border-color: #ff8800;
+}
+
+.touch-btn-slow:active, .touch-btn-slow.active {
+    background: #774400;
+    border-color: #ffaa33;
+}
+
+/* Touch device overrides — when you're on a phone or tablet with a touchscreen */
+/* "pointer: coarse" means "this device uses a finger, not a mouse" */
+@media (pointer: coarse) {
+    #touch-controls {
+        display: flex;
+    }
+    #controls {
+        display: none !important;
+    }
+    .side-score {
+        font-size: 36px;
+        min-width: 40px;
+    }
+    #game-row {
+        gap: 8px;
+    }
+}
+
+/* Small screen overrides — makes things smaller so they fit on tiny phones */
+@media (max-width: 600px) {
+    .side-score {
+        font-size: 28px;
+    }
+    .touch-btn {
+        padding: 8px 14px;
+        font-size: 14px;
+    }
+    #color-picker .columns {
+        flex-direction: column;
+        gap: 20px;
+    }
+    .mode-btn {
+        padding: 12px 24px !important;
+    }
 }

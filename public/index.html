@@ -1,13 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- These settings tell the browser how to read our page -->
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <!-- The title that shows up on the browser tab -->
     <title>Pong</title>
+    <!-- This loads our stylesheet that makes everything look cool -->
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <!-- Mode Selection Overlay -->
+    <!-- This is the MAIN MENU — the first thing you see when the game loads! -->
+    <!-- It has 3 buttons: play vs computer, play vs a friend, or play online -->
     <div id="mode-select">
         <div class="box">
             <h1>Game Modes</h1>
@@ -18,6 +25,7 @@
     </div>
 
     <!-- Username Entry Modal -->
+    <!-- A popup that asks you to type in your name before playing online -->
     <div id="username-modal">
         <div class="box">
             <h1>Enter Username</h1>
@@ -27,16 +35,36 @@
         </div>
     </div>
 
+    <!-- Online Color Picker Modal -->
+    <!-- A popup where you pick your paddle color — any color you want! -->
+    <div id="online-color-modal">
+        <div class="box" style="background:#555;color:#fff;max-width:400px;">
+            <h1 style="color:#fff;">Choose Your Color!</h1>
+            <div id="color-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:20px 0;"></div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
+                <span style="font-size:14px;">Custom:</span>
+                <input type="color" id="online-color-input" value="#ffffff" style="width:50px;height:40px;border:2px solid #888;border-radius:6px;cursor:pointer;background:none;padding:0;">
+            </div>
+            <div id="color-preview" style="width:100%;height:40px;border-radius:8px;border:2px solid #888;margin-bottom:16px;background:#ffffff;"></div>
+            <button class="mode-btn" id="online-color-btn" style="margin-top:0;background:#2a5;border:none;">Continue</button>
+        </div>
+    </div>
+
     <!-- Lobby Screen (populated by LobbyUI.init()) -->
+    <!-- The waiting room where you can see other players and challenge them -->
+    <!-- This starts empty — JavaScript fills it in later -->
     <div id="lobby-screen"></div>
 
     <!-- Game Screen (shared by local and online) -->
+    <!-- This is where the actual Pong game is played! -->
+    <!-- It has the canvas (the playing field), scores on each side, and controls info -->
     <div id="game-screen">
         <div id="game-row">
             <div class="side-score">
                 <div id="score1">0</div>
                 <div id="player-slow-timer"></div>
             </div>
+            <!-- The canvas is like a digital whiteboard where we draw the game -->
             <canvas id="game" width="800" height="500"></canvas>
             <div class="side-score">
                 <div id="score2">0</div>
@@ -47,9 +75,20 @@
             <div>Player 1 (Left): W / S &nbsp;|&nbsp; Start: Enter &nbsp;|&nbsp; Pause: Space</div>
             <div id="p2-label">Player 2 (Right): Arrow Up / Arrow Down</div>
         </div>
+        <!-- Touch controls only show up on phones and tablets -->
+        <div id="touch-controls">
+            <button class="touch-btn" id="touch-enter">Start</button>
+            <button class="touch-btn" id="touch-pause">Pause</button>
+            <button class="touch-btn" id="touch-reset">Reset</button>
+            <button class="touch-btn" id="touch-settings">Settings</button>
+        </div>
     </div>
 
+    <!-- Floating touch action button for online game -->
+    <button id="online-touch-action" style="display:none; position:fixed; bottom:15%; left:50%; transform:translateX(-50%); z-index:9999; padding:20px 60px; font-size:28px; font-family:'Courier New',monospace; background:#2a5; color:#fff; border:3px solid #4d8; border-radius:16px; cursor:pointer; -webkit-tap-highlight-color:transparent; touch-action:manipulation; user-select:none;">READY</button>
+
     <!-- Color Picker Overlay -->
+    <!-- This lets you type in colors for each player's paddle during local games -->
     <div id="color-picker">
         <div class="columns">
             <div class="column">
@@ -65,6 +104,7 @@
     </div>
 
     <!-- Settings Overlay -->
+    <!-- A popup where you can turn music and the background on or off -->
     <div id="settings">
         <h2>Settings</h2>
         <div class="setting-row">
@@ -78,15 +118,16 @@
         <div class="hint">Press Q to close</div>
     </div>
 
-    <!-- Scripts (order matters) -->
+    <!-- Scripts (order matters — each file depends on the ones before it!) -->
+    <!-- socket.io lets us talk to the game server for online play -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/js/constants.js"></script>
-    <script src="/js/audio.js"></script>
-    <script src="/js/renderer.js"></script>
-    <script src="/js/network.js"></script>
-    <script src="/js/lobbyUI.js"></script>
-    <script src="/js/localGame.js"></script>
-    <script src="/js/onlineGame.js"></script>
-    <script src="/js/main.js"></script>
+    <script src="/js/constants.js"></script>  <!-- Game settings like speed and size -->
+    <script src="/js/audio.js"></script>      <!-- Handles all the sounds and music -->
+    <script src="/js/renderer.js"></script>   <!-- Draws the ball, paddles, and field -->
+    <script src="/js/network.js"></script>    <!-- Sends and receives online messages -->
+    <script src="/js/lobbyUI.js"></script>    <!-- Builds the online lobby screen -->
+    <script src="/js/localGame.js"></script>  <!-- Runs the local (same keyboard) game -->
+    <script src="/js/onlineGame.js"></script> <!-- Runs the online game -->
+    <script src="/js/main.js"></script>       <!-- The traffic controller — loaded last! -->
 </body>
 </html>

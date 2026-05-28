@@ -1,34 +1,66 @@
+// ============================================================================
+// LOCAL GAME (localGame.js)
+// ============================================================================
+// This file has ALL the code for playing pong on your own computer.
+// It handles two modes:
+//   1) One player vs the AI (the computer controls the other paddle)
+//   2) Two players on the same keyboard (one uses W/S, the other uses arrows)
+//
+// Everything happens right here — the ball moves, paddles move, scores count,
+// and the screen gets drawn — all inside this one file. No server needed!
+//
+// HOW A GAME LOOP WORKS:
+// A game is like a flipbook. Many times per second (about 60!), the computer:
+//   1. UPDATES the game — moves the ball, moves paddles, checks for collisions
+//   2. DRAWS everything on the screen in its new position
+// This happens so fast it looks like smooth motion, just like a cartoon!
+// The function "requestAnimationFrame" asks the browser to call our loop
+// again right before the next screen refresh.
+// ============================================================================
+
 // LocalGame — all local game logic (1P vs AI and 2P local)
 // Depends on globals: Renderer, AudioManager, and all constants from constants.js
 var LocalGame = (function () {
 
     // ── Canvas ──────────────────────────────────────────────────────────
+    // "canvas" is the rectangle on the web page where we draw the game.
+    // "ctx" (context) is the drawing tool we use to paint on the canvas.
     var canvas, ctx;
 
+    // ── State variables ────────────────────────────────────────────────
+    // These are like little on/off switches that tell us what the game
+    // is doing right now. For example: is the game running? Is it paused?
     // ── Flags ───────────────────────────────────────────────────────────
-    var active = false;
-    var aiMode = false;
-    var gameOver = false;
-    var paused = false;
-    var waitingToStart = true;
-    var countingDown = false;
-    var colorPickerOpen = false;
-    var settingsOpen = false;
+    var active = false;          // Is this game mode turned on?
+    var aiMode = false;          // true = playing vs computer, false = 2 players
+    var gameOver = false;        // Has someone won?
+    var paused = false;          // Did the player press pause?
+    var waitingToStart = true;   // Are we waiting for the player to press Enter?
+    var countingDown = false;    // Is the 3-2-1 countdown happening?
+    var colorPickerOpen = false; // Is the color-picker menu showing?
+    var settingsOpen = false;    // Is the settings menu showing?
 
     // ── Paddles & ball ──────────────────────────────────────────────────
+    // Each paddle has a position (x, y), a size (w = width, h = height),
+    // and a score. The ball has a position AND a velocity (vx, vy) which
+    // is how fast it moves left/right and up/down each frame.
     var paddle1 = { x: 0, y: 0, w: PADDLE_W, h: PADDLE_H, score: 0 };
     var paddle2 = { x: 0, y: 0, w: PADDLE_W, h: PADDLE_H, score: 0 };
     var ball = { x: 0, y: 0, vx: 0, vy: 0 };
 
     // ── Input ───────────────────────────────────────────────────────────
+    // "keys" remembers which keyboard keys are being held down right now.
     var keys = {};
     function clearKeys() { Object.keys(keys).forEach(function (k) { keys[k] = false; }); }
 
     // ── Trail / stars ───────────────────────────────────────────────────
+    // "trail" stores the ball's recent positions so we can draw a cool tail.
+    // "stars" are the little dots in the background that look like space.
     var trail = [];
     var stars = [];
 
     // ── Timers ──────────────────────────────────────────────────────────
+    // Timers track when things started so we know how much time has passed.
     var roundStartTime = 0;
     var slowCooldownStart = 0;
     var aiSlowed = false;
@@ -39,6 +71,7 @@ var LocalGame = (function () {
     var startingPlayer = 0;
 
     // ── Explosion ───────────────────────────────────────────────────────
+    // When someone scores, we show a little firework explosion!
     var exploding = false;
     var explosionParticles = [];
     var explosionStart = 0;
@@ -54,6 +87,23 @@ var LocalGame = (function () {
     var paddle2Color = '#fff';
     var bgEnabled = true;
     var musicEnabled = true;
+
+    // ── Touch state ─────────────────────────────────────────────────────
+    // These let people play on phones/tablets by touching the screen.
+    var touchP1Id = null;   // touch identifier tracking player 1
+    var touchP2Id = null;   // touch identifier tracking player 2
+    var touchP1TargetY = null;  // target Y for smooth paddle movement
+    var touchP2TargetY = null;
+    var boundTouchStart = null;
+    var boundTouchMove = null;
+    var boundTouchEnd = null;
+    var boundTouchEnter = null;
+    var boundTouchPause = null;
+    var boundTouchReset = null;
+    var boundTouchSettings = null;
+
+    // ── Slow button bounds (canvas coords) ────────────────────────────
+    var SLOW_BTN = { x: 10, y: CANVAS_H - 45, w: 80, h: 35 };
 
     // ── Animation ───────────────────────────────────────────────────────
     var animFrameId = null;
@@ -85,7 +135,10 @@ var LocalGame = (function () {
         return Math.max(min, Math.min(max, val));
     }
 
-    // ── Core methods ────────────────────────────────────────────────────
+    // ── Init / Start / Stop ────────────────────────────────────────────
+    // init() sets things up once at the very beginning.
+    // start() begins a new game (called when you pick 1P or 2P mode).
+    // stop() shuts everything down when you leave the game.
 
     function init(canvasEl) {
         canvas = canvasEl;
@@ -165,6 +218,12 @@ var LocalGame = (function () {
     }
 
     // ── Update ──────────────────────────────────────────────────────────
+    // This is the "brain" of the game. Every frame it:
+    //   - Moves the paddles based on key presses (or AI thinking)
+    //   - Moves the ball
+    //   - Checks if the ball hit a wall or paddle (collision detection)
+    //   - Checks if someone scored
+    // It runs about 60 times per second!
 
     function update() {
         if (gameOver || paused || waitingToStart || colorPickerOpen || settingsOpen) return;
@@ -199,13 +258,29 @@ var LocalGame = (function () {
             playerSlowed = false;
         }
 
-        // Player 1 movement (W/S)
+        // Player 1 movement (W/S or touch target)
         var p1Speed = PADDLE_SPEED * (playerSlowed ? 0.67 : 1);
+        if (touchP1TargetY !== null) {
+            var touchDiff1 = touchP1TargetY - paddle1.y;
+            // Smooth lerp: move 30% of remaining distance each frame
+            // but at least p1Speed so it doesn't get stuck
+            var move1 = touchDiff1 * 0.3;
+            if (Math.abs(move1) < 1) {
+                paddle1.y = touchP1TargetY;
+            } else {
+                paddle1.y += move1;
+            }
+        }
         if (keys['w']) paddle1.y -= p1Speed;
         if (keys['s']) paddle1.y += p1Speed;
         paddle1.y = clamp(paddle1.y, 0, CANVAS_H - PADDLE_H);
 
         // Player 2 / AI movement
+        // HOW THE AI WORKS:
+        // The computer looks at where the ball is (ball.y) and where its
+        // paddle center is. If the ball is above the paddle, move up.
+        // If the ball is below, move down. Simple! But it moves a bit
+        // slower than a human (0.75x speed) so it's not impossible to beat.
         if (aiMode) {
             // Check if slow has expired
             if (aiSlowed && Date.now() >= aiSlowedUntil) {
@@ -218,6 +293,15 @@ var LocalGame = (function () {
                 paddle2.y += Math.sign(diff) * aiSpeed;
             }
         } else {
+            if (touchP2TargetY !== null) {
+                var touchDiff2 = touchP2TargetY - paddle2.y;
+                var move2 = touchDiff2 * 0.3;
+                if (Math.abs(move2) < 1) {
+                    paddle2.y = touchP2TargetY;
+                } else {
+                    paddle2.y += move2;
+                }
+            }
             if (keys['arrowup']) paddle2.y -= PADDLE_SPEED;
             if (keys['arrowdown']) paddle2.y += PADDLE_SPEED;
         }
@@ -241,7 +325,21 @@ var LocalGame = (function () {
             ball.vy = -Math.abs(ball.vy);
         }
 
-        // Paddle 1 collision
+        // PADDLE COLLISION MATH — how the ball bounces off a paddle:
+        // First we check: is the ball touching the paddle? We look at whether
+        // the ball's edges overlap with the paddle's edges (like two rectangles
+        // overlapping).
+        //
+        // Then we figure out WHERE on the paddle the ball hit:
+        //   - "hit" goes from -1 (top edge) to +1 (bottom edge), 0 = center.
+        //   - If the ball hits near the top of the paddle, it bounces upward.
+        //   - If it hits near the bottom, it bounces downward.
+        //   - If it hits the middle, it goes mostly straight.
+        //
+        // The ball also speeds up a tiny bit (+0.7) each time it's hit,
+        // up to a max speed. This makes the game get harder over time!
+
+        // Paddle 1 collision (left paddle)
         if (ball.vx < 0 &&
             ball.x - BALL_SIZE / 2 <= paddle1.x + paddle1.w &&
             ball.x + BALL_SIZE / 2 >= paddle1.x &&
@@ -256,7 +354,7 @@ var LocalGame = (function () {
             AudioManager.playLaserSound();
         }
 
-        // Paddle 2 collision
+        // Paddle 2 collision (right paddle) — same idea, but ball goes left
         if (ball.vx > 0 &&
             ball.x + BALL_SIZE / 2 >= paddle2.x &&
             ball.x - BALL_SIZE / 2 <= paddle2.x + paddle2.w &&
@@ -333,6 +431,9 @@ var LocalGame = (function () {
     }
 
     // ── Draw ────────────────────────────────────────────────────────────
+    // This is the "artist" of the game. It paints everything on screen:
+    // background, stars, paddles, ball, trail, explosions, and any menus.
+    // It does NOT move anything — that's update()'s job.
 
     function draw() {
         var W = CANVAS_W;
@@ -359,39 +460,35 @@ var LocalGame = (function () {
             Renderer.drawExplosion(ctx, explosionParticles, elapsed);
         }
 
-        // Slow ability timer (AI mode only)
+        // Draw slow button on canvas (AI mode only)
         if (aiMode && !waitingToStart && !gameOver) {
+            var sbx = SLOW_BTN.x, sby = SLOW_BTN.y, sbw = SLOW_BTN.w, sbh = SLOW_BTN.h, sbr = 8;
             var elapsed = Date.now() - slowCooldownStart;
+            var sbColor, sbText;
             if (aiSlowed) {
-                slowTimerEl.style.color = '#ff6666';
-                slowTimerEl.textContent = 'SLOWED';
+                sbColor = '#ff8800'; sbText = 'ACTIVE';
             } else if (elapsed >= SLOW_COOLDOWN) {
-                slowTimerEl.style.color = '#00ff00';
-                slowTimerEl.textContent = 'READY';
+                sbColor = '#4caf50'; sbText = 'SLOW';
             } else {
-                var remaining = Math.ceil((SLOW_COOLDOWN - elapsed) / 1000);
-                slowTimerEl.style.color = '#888';
-                slowTimerEl.textContent = remaining + 's';
+                sbColor = '#555'; sbText = Math.ceil((SLOW_COOLDOWN - elapsed) / 1000) + 's';
             }
-        } else {
-            slowTimerEl.textContent = '';
-        }
-
-        // Player slow timer (AI mode only)
-        if (aiMode && !waitingToStart && !gameOver) {
-            var roundElapsed = Date.now() - roundStartTime;
-            if (playerSlowed) {
-                playerSlowTimerEl.style.color = '#ff6666';
-                playerSlowTimerEl.textContent = 'SLOWED';
-            } else if (roundElapsed >= PLAYER_SLOW_DELAY) {
-                playerSlowTimerEl.textContent = '';
-            } else {
-                var remaining = Math.ceil((PLAYER_SLOW_DELAY - roundElapsed) / 1000);
-                playerSlowTimerEl.style.color = '#888';
-                playerSlowTimerEl.textContent = remaining + 's';
-            }
-        } else {
-            playerSlowTimerEl.textContent = '';
+            ctx.beginPath();
+            ctx.moveTo(sbx + sbr, sby);
+            ctx.lineTo(sbx + sbw - sbr, sby);
+            ctx.quadraticCurveTo(sbx + sbw, sby, sbx + sbw, sby + sbr);
+            ctx.lineTo(sbx + sbw, sby + sbh - sbr);
+            ctx.quadraticCurveTo(sbx + sbw, sby + sbh, sbx + sbw - sbr, sby + sbh);
+            ctx.lineTo(sbx + sbr, sby + sbh);
+            ctx.quadraticCurveTo(sbx, sby + sbh, sbx, sby + sbh - sbr);
+            ctx.lineTo(sbx, sby + sbr);
+            ctx.quadraticCurveTo(sbx, sby, sbx + sbr, sby);
+            ctx.closePath();
+            ctx.fillStyle = sbColor;
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.font = '16px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(sbText, sbx + sbw / 2, sby + sbh / 2 + 6);
         }
 
         // Pause overlay
@@ -471,15 +568,30 @@ var LocalGame = (function () {
     }
 
     // ── Game loop ───────────────────────────────────────────────────────
+    // This is the heartbeat of the game! It calls update() then draw(),
+    // then asks the browser to call it again. This creates an endless
+    // cycle that runs ~60 times per second until we stop the game.
 
     function gameLoop() {
         if (!active) return;
-        update();
-        draw();
-        animFrameId = requestAnimationFrame(gameLoop);
+        update();  // Step 1: move everything and check collisions
+        draw();    // Step 2: paint the new picture on screen
+        animFrameId = requestAnimationFrame(gameLoop); // Step 3: do it again!
     }
 
-    // ── Key handling ────────────────────────────────────────────────────
+    // ── Keyboard handling ─────────────────────────────────────────────
+    // When you press a key, the browser fires a "keydown" event.
+    // When you let go, it fires "keyup". We listen for both so we know
+    // which keys are currently held down. This is how we move paddles!
+    //   W / S         = Player 1 up / down
+    //   Arrow Up/Down = Player 2 up / down
+    //   Space         = Pause or restart after game over
+    //   Enter         = Start the round
+    //   Shift         = Activate "slow" power-up (AI mode)
+    //   E             = Open color picker
+    //   Q             = Open settings
+    //   R             = Reset the game
+    //   Ctrl          = Go back to the menu
 
     function onKeyDown(e) {
         if (!active) return;
@@ -597,7 +709,152 @@ var LocalGame = (function () {
         bgToggle.classList.toggle('on', bgEnabled);
     }
 
+    // ── Touch handling (for phones and tablets) ────────────────────────
+    // On a touchscreen there's no keyboard, so players drag their finger
+    // on their side of the screen to move their paddle. The left half
+    // controls Player 1, the right half controls Player 2.
+
+    function touchToCanvas(touch) {
+        var rect = canvas.getBoundingClientRect();
+        var scaleX = canvas.width / rect.width;
+        var scaleY = canvas.height / rect.height;
+        return {
+            x: (touch.clientX - rect.left) * scaleX,
+            y: (touch.clientY - rect.top) * scaleY
+        };
+    }
+
+    function resumeAudioOnTouch() {
+        if (typeof AudioManager !== 'undefined' && AudioManager.audioCtx && AudioManager.audioCtx.state === 'suspended') {
+            AudioManager.audioCtx.resume();
+        }
+    }
+
+    function isInsideSlowBtn(cx, cy) {
+        return cx >= SLOW_BTN.x && cx <= SLOW_BTN.x + SLOW_BTN.w &&
+               cy >= SLOW_BTN.y && cy <= SLOW_BTN.y + SLOW_BTN.h;
+    }
+
+    function onCanvasTouchStart(e) {
+        if (!active) return;
+        e.preventDefault();
+        resumeAudioOnTouch();
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            var touch = e.changedTouches[i];
+            var pos = touchToCanvas(touch);
+            // Check slow button tap
+            if (aiMode && isInsideSlowBtn(pos.x, pos.y)) {
+                if (!waitingToStart && !gameOver && !paused) {
+                    var elapsed = Date.now() - slowCooldownStart;
+                    if (elapsed >= SLOW_COOLDOWN && !aiSlowed) {
+                        aiSlowed = true;
+                        aiSlowedUntil = Date.now() + SLOW_DURATION;
+                        slowCooldownStart = Date.now();
+                    }
+                }
+                continue;
+            }
+            if (aiMode || pos.x < CANVAS_W / 2) {
+                // In AI mode, whole canvas controls player 1
+                // In 2P mode, left half controls player 1
+                touchP1Id = touch.identifier;
+                touchP1TargetY = clamp(pos.y - PADDLE_H / 2, 0, CANVAS_H - PADDLE_H);
+            } else {
+                // Right half — player 2 (only in 2P mode)
+                touchP2Id = touch.identifier;
+                touchP2TargetY = clamp(pos.y - PADDLE_H / 2, 0, CANVAS_H - PADDLE_H);
+            }
+        }
+    }
+
+    function onCanvasTouchMove(e) {
+        if (!active) return;
+        e.preventDefault();
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            var touch = e.changedTouches[i];
+            var pos = touchToCanvas(touch);
+            if (touch.identifier === touchP1Id) {
+                touchP1TargetY = clamp(pos.y - PADDLE_H / 2, 0, CANVAS_H - PADDLE_H);
+            } else if (touch.identifier === touchP2Id) {
+                touchP2TargetY = clamp(pos.y - PADDLE_H / 2, 0, CANVAS_H - PADDLE_H);
+            }
+        }
+    }
+
+    function onCanvasTouchEnd(e) {
+        if (!active) return;
+        e.preventDefault();
+        for (var i = 0; i < e.changedTouches.length; i++) {
+            var touch = e.changedTouches[i];
+            if (touch.identifier === touchP1Id) { touchP1Id = null; touchP1TargetY = null; }
+            if (touch.identifier === touchP2Id) { touchP2Id = null; touchP2TargetY = null; }
+        }
+    }
+
+    function onTouchEnterBtn(e) {
+        e.preventDefault();
+        resumeAudioOnTouch();
+        if (settingsOpen) {
+            settingsOpen = false;
+            paused = false;
+            settingsEl.style.display = 'none';
+            clearKeys();
+            return;
+        }
+        if (colorPickerOpen) {
+            var c1 = p1ColorInput.value.trim();
+            var c2 = p2ColorInput.value.trim();
+            if (c1) paddle1Color = c1;
+            if (c2) paddle2Color = c2;
+            colorPickerOpen = false;
+            paused = false;
+            colorPickerEl.style.display = 'none';
+            clearKeys();
+            return;
+        }
+        if (waitingToStart && !countingDown) {
+            countingDown = true;
+            countdownStart = Date.now();
+            return;
+        }
+        if (gameOver) {
+            resetGame();
+            return;
+        }
+    }
+
+    function onTouchPauseBtn(e) {
+        e.preventDefault();
+        if (gameOver || waitingToStart) return;
+        paused = !paused;
+        if (!paused) clearKeys();
+    }
+
+    function onTouchResetBtn(e) {
+        e.preventDefault();
+        resetGame();
+    }
+
+    function onTouchSettingsBtn(e) {
+        e.preventDefault();
+        if (settingsOpen) {
+            settingsOpen = false;
+            paused = false;
+            settingsEl.style.display = 'none';
+            clearKeys();
+        } else if (!colorPickerOpen) {
+            settingsOpen = true;
+            paused = true;
+            settingsEl.style.display = 'block';
+            clearKeys();
+        }
+    }
+
     // ── Start / Stop ────────────────────────────────────────────────────
+    // start() sets up everything for a new game — puts paddles in the
+    // middle, resets scores to 0, hooks up keyboard/touch controls,
+    // and kicks off the game loop.
+    // stop() tears it all down — removes controls and stops the loop.
 
     function start(isAiMode) {
         aiMode = isAiMode;
@@ -649,6 +906,26 @@ var LocalGame = (function () {
         musicToggle.addEventListener('click', onMusicToggleClick);
         bgToggle.addEventListener('click', onBgToggleClick);
 
+        // Attach touch listeners
+        touchP1Id = null;
+        touchP2Id = null;
+        touchP1TargetY = null;
+        touchP2TargetY = null;
+        canvas.addEventListener('touchstart', onCanvasTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', onCanvasTouchMove, { passive: false });
+        canvas.addEventListener('touchend', onCanvasTouchEnd, { passive: false });
+        canvas.addEventListener('touchcancel', onCanvasTouchEnd, { passive: false });
+
+        var touchEnterBtn = document.getElementById('touch-enter');
+        var touchPauseBtn = document.getElementById('touch-pause');
+        var touchResetBtn = document.getElementById('touch-reset');
+        var touchSettingsBtn = document.getElementById('touch-settings');
+
+        if (touchEnterBtn) touchEnterBtn.addEventListener('touchstart', onTouchEnterBtn, { passive: false });
+        if (touchPauseBtn) touchPauseBtn.addEventListener('touchstart', onTouchPauseBtn, { passive: false });
+        if (touchResetBtn) touchResetBtn.addEventListener('touchstart', onTouchResetBtn, { passive: false });
+        if (touchSettingsBtn) touchSettingsBtn.addEventListener('touchstart', onTouchSettingsBtn, { passive: false });
+
         // Start loop
         gameLoop();
     }
@@ -666,6 +943,28 @@ var LocalGame = (function () {
         window.removeEventListener('blur', onBlur);
         if (musicToggle) musicToggle.removeEventListener('click', onMusicToggleClick);
         if (bgToggle) bgToggle.removeEventListener('click', onBgToggleClick);
+
+        // Remove touch listeners
+        if (canvas) {
+            canvas.removeEventListener('touchstart', onCanvasTouchStart);
+            canvas.removeEventListener('touchmove', onCanvasTouchMove);
+            canvas.removeEventListener('touchend', onCanvasTouchEnd);
+            canvas.removeEventListener('touchcancel', onCanvasTouchEnd);
+        }
+        touchP1Id = null;
+        touchP2Id = null;
+        touchP1TargetY = null;
+        touchP2TargetY = null;
+
+        var touchEnterBtn = document.getElementById('touch-enter');
+        var touchPauseBtn = document.getElementById('touch-pause');
+        var touchResetBtn = document.getElementById('touch-reset');
+        var touchSettingsBtn = document.getElementById('touch-settings');
+
+        if (touchEnterBtn) touchEnterBtn.removeEventListener('touchstart', onTouchEnterBtn);
+        if (touchPauseBtn) touchPauseBtn.removeEventListener('touchstart', onTouchPauseBtn);
+        if (touchResetBtn) touchResetBtn.removeEventListener('touchstart', onTouchResetBtn);
+        if (touchSettingsBtn) touchSettingsBtn.removeEventListener('touchstart', onTouchSettingsBtn);
 
         // Clear timers display
         if (slowTimerEl) slowTimerEl.textContent = '';

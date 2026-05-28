@@ -1,26 +1,53 @@
-// LobbyUI — manages the online lobby screen DOM
-// Depends on Network global for username/socketId context
+// ============================================================
+// lobbyUI.js - Building the Online Lobby (Waiting Room!)
+// ============================================================
+// Think of the lobby like a WAITING ROOM before a game starts.
+// Imagine a room at a bowling alley where you can:
+//   - See who else is there (player list)
+//   - Ask someone to play (challenge button)
+//   - Watch other people's games (spectate)
+//   - See who's the best (leaderboard)
+//
+// This file BUILDS that waiting room screen using JavaScript
+// instead of writing it in HTML. Why? Because the lobby is
+// complex and only needed for online play. Building it with
+// code means we can easily update it when new data arrives
+// from the server.
+//
+// It uses "DOM manipulation" -- that's a fancy way of saying
+// "creating and changing HTML elements with JavaScript code."
+// DOM stands for "Document Object Model" -- it's how the browser
+// organizes all the pieces of a webpage, like a family tree of
+// elements (divs inside divs inside the page).
+// ============================================================
 
 var LobbyUI = (function () {
 
-    var container = null;
-    var playerListEl = null;
-    var activeGamesEl = null;
-    var leaderboardEl = null;
-    var matchHistoryEl = null;
-    var modalOverlay = null;
-    var notificationTimeout = null;
+    // References to important parts of the lobby we create
+    var container = null;         // The whole lobby screen
+    var playerListEl = null;      // The box showing online players
+    var activeGamesEl = null;     // The box showing games in progress
+    var leaderboardEl = null;     // The box showing top players
+    var matchHistoryEl = null;    // The box showing recent matches
+    var modalOverlay = null;      // Pop-up window (for challenges)
+    var notificationTimeout = null; // Timer for toast messages
 
+    // Functions to call when the user clicks Challenge or Watch
     var onChallengeCallback = null;
     var onSpectateCallback = null;
 
-    // --- Style injection ---
-
+    // --- STYLE INJECTION ---
+    // This adds CSS styles for the lobby directly into the page.
+    // It's like writing the fashion rules for how lobby elements should look.
+    // We do this in JavaScript because these styles only matter when
+    // the lobby exists.
     function injectStyles() {
+        // Don't add styles twice!
         if (document.getElementById('lobby-styles')) return;
 
         var style = document.createElement('style');
         style.id = 'lobby-styles';
+        // All the CSS rules for the lobby, joined into one big string
         style.textContent = [
             '#lobby-screen {',
             '  position: fixed; top: 0; left: 0; width: 100%; height: 100%;',
@@ -146,8 +173,12 @@ var LobbyUI = (function () {
         document.head.appendChild(style);
     }
 
-    // --- DOM creation helpers ---
-
+    // --- DOM CREATION HELPER ---
+    // This is a handy shortcut function for creating HTML elements.
+    // Instead of writing 5 lines to make a button, we can do it in 1!
+    // - tag: what kind of element ("div", "button", "span", etc.)
+    // - attrs: properties like className, textContent, onClick
+    // - children: other elements to put inside this one
     function el(tag, attrs, children) {
         var node = document.createElement(tag);
         if (attrs) {
@@ -157,12 +188,15 @@ var LobbyUI = (function () {
                 } else if (key === 'textContent') {
                     node.textContent = attrs[key];
                 } else if (key.indexOf('on') === 0) {
+                    // If the attribute starts with "on" (like onClick),
+                    // set it up as an event listener
                     node.addEventListener(key.slice(2).toLowerCase(), attrs[key]);
                 } else {
                     node.setAttribute(key, attrs[key]);
                 }
             }
         }
+        // Add child elements (or text) inside this element
         if (children) {
             if (!Array.isArray(children)) children = [children];
             for (var i = 0; i < children.length; i++) {
@@ -176,42 +210,37 @@ var LobbyUI = (function () {
         return node;
     }
 
-    // --- Public methods ---
-
-    /**
-     * Show the lobby screen.
-     */
+    // --- SHOW / HIDE THE LOBBY ---
     function show() {
         if (container) container.classList.add('visible');
     }
 
-    /**
-     * Hide the lobby screen.
-     */
     function hide() {
         if (container) container.classList.remove('visible');
     }
 
-    /**
-     * Initialize the lobby DOM structure.
-     * @param {function} onChallenge - called with socketId when a player is challenged
-     * @param {function} onSpectate - called with gameId when user wants to spectate
-     * @param {function} onLeaveOnline - called when user clicks "Leave"
-     */
+    // --- INITIALIZE THE LOBBY ---
+    // This builds the entire lobby screen from scratch!
+    // It creates the header, three columns (players, games, leaderboard),
+    // and a bottom section for match history.
+    // The three parameters are callback functions -- they tell this file
+    // what to do when someone clicks "Challenge", "Watch", or "Leave."
+    // That way, lobbyUI.js just builds the screen, and the MAIN code
+    // decides what actually happens when buttons are clicked.
     function init(onChallenge, onSpectate, onLeaveOnline) {
         injectStyles();
 
         onChallengeCallback = onChallenge;
         onSpectateCallback = onSpectate;
 
-        // Remove existing lobby if re-initialized
+        // Clean up if we're re-creating the lobby
         var existing = document.getElementById('lobby-screen');
         if (existing) existing.remove();
 
-        // Main container
+        // Create the main lobby container
         container = el('div', { id: 'lobby-screen' });
 
-        // --- Header ---
+        // --- HEADER (top bar with title and leave button) ---
         var usernameDisplay = el('span', { className: 'lobby-user' },
             Network.username ? 'Logged in as: ' + Network.username : '');
         var leaveBtn = el('button', {
@@ -228,24 +257,27 @@ var LobbyUI = (function () {
         ]);
         container.appendChild(header);
 
-        // --- Three-column layout ---
+        // --- THREE-COLUMN LAYOUT ---
+        // The lobby has 3 side-by-side panels, like newspaper columns
         var columns = el('div', { className: 'lobby-columns' });
 
-        // Left panel: Players
+        // LEFT PANEL: Shows all online players with colored status dots
+        // Green = idle (available), Yellow = in a game, Blue = watching
         playerListEl = el('div', { className: 'lobby-panel-body' });
         var leftPanel = el('div', { className: 'lobby-panel' }, [
             el('div', { className: 'lobby-panel-header' }, 'Players'),
             playerListEl
         ]);
 
-        // Center panel: Active Games
+        // CENTER PANEL: Shows games being played right now (you can watch!)
         activeGamesEl = el('div', { className: 'lobby-panel-body' });
         var centerPanel = el('div', { className: 'lobby-panel' }, [
             el('div', { className: 'lobby-panel-header' }, 'Active Games'),
             activeGamesEl
         ]);
 
-        // Right panel: Leaderboard
+        // RIGHT PANEL: Leaderboard showing the best players
+        // Has buttons to sort by total wins or by win percentage
         leaderboardEl = el('div', { className: 'lobby-panel-body' });
         var activeSortBtn = 'wins';
 
@@ -288,7 +320,8 @@ var LobbyUI = (function () {
         columns.appendChild(rightPanel);
         container.appendChild(columns);
 
-        // --- Bottom section: Match History ---
+        // --- BOTTOM SECTION: Match History ---
+        // Shows a table of recent games that were played
         matchHistoryEl = el('div', { className: 'lobby-panel-body' });
         var bottomSection = el('div', { className: 'lobby-bottom' }, [
             el('div', { className: 'lobby-panel-header' }, 'Match History'),
@@ -296,15 +329,21 @@ var LobbyUI = (function () {
         ]);
         container.appendChild(bottomSection);
 
+        // Add the whole lobby to the page!
         document.body.appendChild(container);
     }
 
-    /**
-     * Re-render the player list.
-     * @param {Array} players - array of { username, status, socketId }
-     */
+    // --- UPDATE PLAYER LIST ---
+    // Rebuilds the list of online players whenever it changes.
+    // Each player shows a colored dot for their status and a
+    // "Challenge" button if they're available to play.
+    // This gets called every time someone joins, leaves, or
+    // starts a game -- the server sends a fresh list and we
+    // redraw everything. It's like erasing a whiteboard and
+    // writing the new list of names!
     function updatePlayerList(players) {
         if (!playerListEl) return;
+        // Clear the old list and rebuild it
         playerListEl.innerHTML = '';
 
         if (!players || players.length === 0) {
@@ -317,6 +356,7 @@ var LobbyUI = (function () {
 
         for (var i = 0; i < players.length; i++) {
             var p = players[i];
+            // Pick the right color dot based on what the player is doing
             var statusClass = 'status-idle';
             if (p.status === 'in-game') statusClass = 'status-in-game';
             else if (p.status === 'spectating') statusClass = 'status-spectating';
@@ -326,8 +366,11 @@ var LobbyUI = (function () {
 
             var item = el('div', { className: 'player-item' }, [badge, name]);
 
-            // Add challenge button for idle players that are not yourself
+            // Only show Challenge button for idle players who aren't YOU
             if (p.status === 'idle' && p.socketId !== (Network.socket && Network.socket.id)) {
+                // The tricky "(function(sid) { ... })(p.socketId)" pattern is
+                // called a "closure" - it remembers which player's ID to use
+                // when the button is clicked, even later!
                 var challengeBtn = el('button', {
                     className: 'lobby-btn primary small',
                     textContent: 'Challenge',
@@ -345,10 +388,9 @@ var LobbyUI = (function () {
         }
     }
 
-    /**
-     * Re-render the active games list.
-     * @param {Array} games - array of { id, player1, player2, scores }
-     */
+    // --- UPDATE ACTIVE GAMES ---
+    // Shows all games being played right now with a "Watch" button.
+    // Like a TV guide that shows what's on -- you pick a game to watch!
     function updateActiveGames(games) {
         if (!activeGamesEl) return;
         activeGamesEl.innerHTML = '';
@@ -379,15 +421,15 @@ var LobbyUI = (function () {
         }
     }
 
-    /**
-     * Re-render the leaderboard table.
-     * @param {Array} data - array of leaderboard entries
-     */
+    // --- UPDATE LEADERBOARD ---
+    // Builds a table showing the top players with their wins, losses,
+    // and win rate (what percentage of games they win)
     function updateLeaderboard(data) {
         if (!leaderboardEl) return;
         leaderboardEl.innerHTML = '';
 
         var table = el('table', { className: 'leaderboard-table' });
+        // Table header row (the titles at the top of each column)
         var thead = el('thead', null, [
             el('tr', null, [
                 el('th', { textContent: 'Rank' }),
@@ -399,10 +441,12 @@ var LobbyUI = (function () {
         ]);
         table.appendChild(thead);
 
+        // Table body (the actual data rows)
         var tbody = el('tbody');
         if (data && data.length > 0) {
             for (var i = 0; i < data.length; i++) {
                 var d = data[i];
+                // Convert win rate from decimal (0.75) to percentage (75.0%)
                 var winRate = d.winRate !== undefined
                     ? (d.winRate * 100).toFixed(1) + '%'
                     : '0.0%';
@@ -425,10 +469,8 @@ var LobbyUI = (function () {
         leaderboardEl.appendChild(table);
     }
 
-    /**
-     * Re-render the match history table.
-     * @param {Array} matches - array of match objects
-     */
+    // --- UPDATE MATCH HISTORY ---
+    // Shows a table of past games with dates, players, scores, and winner
     function updateMatchHistory(matches) {
         if (!matchHistoryEl) return;
         matchHistoryEl.innerHTML = '';
@@ -449,6 +491,7 @@ var LobbyUI = (function () {
         if (matches && matches.length > 0) {
             for (var i = 0; i < matches.length; i++) {
                 var m = matches[i];
+                // Format the date into something readable
                 var dateStr = '';
                 if (m.date) {
                     var d = new Date(m.date);
@@ -474,13 +517,13 @@ var LobbyUI = (function () {
         matchHistoryEl.appendChild(table);
     }
 
-    /**
-     * Show a modal when someone challenges you.
-     * @param {string} fromUsername - challenger's name
-     * @param {function} onAccept - called when Accept is clicked
-     * @param {function} onDecline - called when Decline is clicked
-     */
+    // --- CHALLENGE MODAL (pop-up window) ---
+    // When someone challenges you, this pop-up appears with Accept/Decline buttons.
+    // A "modal" is a pop-up that blocks everything behind it until you respond --
+    // like when a friend asks "wanna play?" and stands there waiting for your answer.
+    // You HAVE to say yes or no before you can do anything else!
     function showChallengeModal(fromUsername, onAccept, onDecline) {
+        // Remove any existing modal first
         hideChallengeModal();
 
         modalOverlay = el('div', { className: 'lobby-modal-overlay' }, [
@@ -511,11 +554,10 @@ var LobbyUI = (function () {
         document.body.appendChild(modalOverlay);
     }
 
-    /**
-     * Show a modal while waiting for challenge response.
-     * @param {string} toUsername - name of the player being challenged
-     * @param {function} onCancel - called when Cancel is clicked
-     */
+    // --- "CHALLENGING..." MODAL ---
+    // Shows while waiting for the other player to accept or decline.
+    // This is what YOU see after you challenge someone -- a "please
+    // wait" screen with a Cancel button in case you change your mind.
     function showChallengingModal(toUsername, onCancel) {
         hideChallengeModal();
 
@@ -539,9 +581,7 @@ var LobbyUI = (function () {
         document.body.appendChild(modalOverlay);
     }
 
-    /**
-     * Remove any visible challenge modal.
-     */
+    // Remove any visible challenge modal
     function hideChallengeModal() {
         if (modalOverlay) {
             modalOverlay.remove();
@@ -549,13 +589,12 @@ var LobbyUI = (function () {
         }
     }
 
-    /**
-     * Show a brief toast notification.
-     * @param {string} message - text to display
-     * @param {string} type - 'success', 'error', or 'info'
-     */
+    // --- TOAST NOTIFICATION ---
+    // A "toast" is a small message that pops up at the bottom of the screen
+    // for a few seconds and then disappears -- like toast popping up from a toaster!
+    // Used for quick messages like "Challenge declined" or "Player left."
+    // The "type" can be 'success' (green), 'error' (red), or 'info' (blue).
     function showNotification(message, type) {
-        // Remove any existing toast
         var existing = document.querySelector('.lobby-toast');
         if (existing) existing.remove();
         if (notificationTimeout) clearTimeout(notificationTimeout);
@@ -564,11 +603,12 @@ var LobbyUI = (function () {
         var toast = el('div', { className: 'lobby-toast ' + type, textContent: message });
         document.body.appendChild(toast);
 
-        // Trigger show after a frame for the CSS transition
+        // Wait one animation frame, then fade in (CSS transition handles the animation)
         requestAnimationFrame(function () {
             toast.classList.add('show');
         });
 
+        // After 3 seconds, fade out and remove
         notificationTimeout = setTimeout(function () {
             toast.classList.remove('show');
             setTimeout(function () {
@@ -577,8 +617,9 @@ var LobbyUI = (function () {
         }, 3000);
     }
 
-    // --- Expose public interface ---
-
+    // --- PUBLIC INTERFACE ---
+    // This is the "menu" of things other files can use from LobbyUI.
+    // Anything NOT listed here is private -- hidden inside this file.
     return {
         show: show,
         hide: hide,

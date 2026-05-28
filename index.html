@@ -1,11 +1,35 @@
+<!--
+==========================================================
+  MASON'S PONG GAME
+==========================================================
+  This file is a complete Pong game built with HTML, CSS,
+  and JavaScript -- all in one file!
+
+  Pong is one of the first video games ever made. Two
+  players each control a paddle, and they try to hit a
+  ball past the other player to score points.
+
+  HOW THIS FILE IS ORGANIZED:
+  1. CSS (styles)  - makes everything look cool
+  2. HTML (body)   - the buttons, scores, and canvas you see
+  3. JavaScript    - the code that makes the game actually work
+
+  The game uses a <canvas> element, which is like a digital
+  drawing board where we draw the paddles, ball, stars,
+  and special effects every single frame (60 times a second!).
+==========================================================
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pong</title>
+    <!-- All the CSS styles that make the game look nice -->
     <style>
+        /* Remove all default spacing so the game fills the screen cleanly */
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* The body is the whole page -- we make it dark and center everything */
         body {
             background: #111;
             display: flex;
@@ -16,21 +40,27 @@
             font-family: 'Courier New', monospace;
             color: #fff;
             user-select: none;
+            overflow: hidden;
+            touch-action: none;
         }
+        /* This row holds the scores on the left and right, with the game canvas in the middle */
         #game-row {
             display: flex;
             align-items: center;
             gap: 24px;
         }
+        /* The big score numbers shown beside the game */
         .side-score {
             font-size: 64px;
             min-width: 60px;
             text-align: center;
         }
+        /* The canvas is our drawing board where the game is drawn */
         canvas {
             border: 2px solid #444;
             display: block;
         }
+        /* The keyboard instructions shown below the game */
         #controls {
             margin-top: 16px;
             font-size: 14px;
@@ -42,6 +72,7 @@
             font-size: 16px;
             min-height: 24px;
         }
+        /* The color picker popup that lets you change paddle colors */
         #color-picker {
             display: none;
             position: absolute;
@@ -85,6 +116,7 @@
             font-size: 14px;
             color: #666;
         }
+        /* The screen that appears first asking you to pick 1 Player or 2 Players */
         #mode-select {
             position: absolute;
             top: 0;
@@ -125,6 +157,7 @@
         #mode-select .mode-btn:hover {
             background: #555;
         }
+        /* The settings popup where you can turn music and background on/off */
         #settings {
             display: none;
             position: absolute;
@@ -151,6 +184,7 @@
             margin-bottom: 16px;
             font-size: 18px;
         }
+        /* The on/off switch -- a little sliding circle that toggles settings */
         .toggle {
             width: 50px;
             height: 26px;
@@ -182,9 +216,66 @@
             font-size: 14px;
             color: #ccc;
         }
+        /* Responsive canvas */
+        #game-row {
+            max-width: 100vw;
+        }
+        canvas {
+            max-width: calc(100vw - 180px);
+            height: auto;
+        }
+        /* Touch controls -- buttons that show up on phones and tablets instead of keyboard */
+        #touch-controls {
+            display: none;
+            margin-top: 12px;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .touch-btn {
+            padding: 12px 20px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            background: #333;
+            color: #fff;
+            border: 2px solid #666;
+            border-radius: 8px;
+            cursor: pointer;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .touch-btn:active, .touch-btn.active {
+            background: #555;
+            border-color: #aaa;
+        }
+        .touch-btn-slow {
+            background: #553300;
+            border-color: #ff8800;
+        }
+        .touch-btn-slow:active, .touch-btn-slow.active {
+            background: #884400;
+        }
+        /* On touchscreens (phones/tablets), show touch buttons and hide keyboard instructions */
+        @media (pointer: coarse) {
+            #touch-controls { display: flex; }
+            #controls { display: none; }
+            .side-score { font-size: 36px; min-width: 40px; }
+            canvas { max-width: calc(100vw - 120px); }
+        }
+        /* On small screens, shrink things so they fit */
+        @media (max-width: 600px) {
+            .side-score { font-size: 28px; min-width: 30px; }
+            canvas { max-width: calc(100vw - 80px); }
+            .touch-btn { padding: 10px 14px; font-size: 14px; }
+            #color-picker { padding: 20px; }
+            #color-picker .columns { flex-direction: column; gap: 20px; }
+            #settings { padding: 20px; }
+            .mode-btn { padding: 12px 24px; font-size: 18px; }
+        }
     </style>
 </head>
 <body>
+    <!-- ===== MODE SELECT SCREEN: the first thing you see, pick 1P or 2P ===== -->
     <div id="mode-select">
         <div class="box">
             <h1>Game Modes</h1>
@@ -192,6 +283,7 @@
             <button class="mode-btn" id="mode-2p">2 Players</button>
         </div>
     </div>
+    <!-- ===== SETTINGS POPUP: toggle music and background on/off ===== -->
     <div id="settings">
         <h2>Settings</h2>
         <div class="setting-row">
@@ -204,6 +296,7 @@
         </div>
         <div class="hint">Press Q to close</div>
     </div>
+    <!-- ===== COLOR PICKER: type in colors for each player's paddle ===== -->
     <div id="color-picker">
         <div class="columns">
             <div class="column">
@@ -217,25 +310,43 @@
         </div>
         <div class="hint">Press SPACE to continue</div>
     </div>
+    <!-- ===== GAME AREA: scores on the sides, canvas (drawing board) in the middle ===== -->
     <div id="game-row">
         <div class="side-score">
             <div id="score1">0</div>
             <div id="player-slow-timer"></div>
         </div>
+        <!-- The canvas is like a blank piece of paper we draw the whole game on -->
         <canvas id="game" width="800" height="500"></canvas>
         <div class="side-score">
             <div id="score2">0</div>
             <div id="slow-timer"></div>
         </div>
     </div>
+    <!-- ===== KEYBOARD CONTROLS: shown on computers, hidden on phones ===== -->
     <div id="controls">
         <div>Player 1 (Left): W / S &nbsp;|&nbsp; Start: Enter &nbsp;|&nbsp; Pause: Space</div>
         <div id="p2-label">Player 2 (Right): Arrow Up / Arrow Down</div>
     </div>
+    <!-- ===== TOUCH CONTROLS: buttons that only show up on phones/tablets ===== -->
+    <div id="touch-controls">
+        <button class="touch-btn" id="touch-enter">Start</button>
+        <button class="touch-btn" id="touch-pause">Pause</button>
+        <button class="touch-btn" id="touch-reset">Reset</button>
+        <button class="touch-btn" id="touch-settings">Settings</button>
+    </div>
 
     <script>
+        // ============================================================
+        // JAVASCRIPT: This is where ALL the game logic lives!
+        // Everything below makes the game actually work.
+        // ============================================================
+
+        // ---- GRABBING HTML ELEMENTS ----
+        // We need to talk to parts of the page, so we grab them by their ID.
+        // Think of it like giving nicknames to things so we can use them later.
         const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d'); // "ctx" is our paintbrush for drawing on the canvas
         const score1El = document.getElementById('score1');
         const score2El = document.getElementById('score2');
         const modeSelectEl = document.getElementById('mode-select');
@@ -252,59 +363,76 @@
         const p2ColorLabel = document.getElementById('p2-color-label');
         const p2Label = document.getElementById('p2-label');
 
+        // ---- GAME BOARD SIZE ----
+        // W = width of the game (left to right), H = height (top to bottom)
         const W = canvas.width;
         const H = canvas.height;
 
-        const PADDLE_W = 12;
-        const PADDLE_H = 90;
-        const PADDLE_SPEED = 6;
-        const BALL_SIZE = 10;
-        const BALL_SPEED_INIT = 5;
-        const BALL_SPEED_MAX = 12;
-        const WIN_SCORE = 10;
+        // ---- GAME SETTINGS (constants) ----
+        // These are like the "rules" of the game. We use ALL_CAPS names
+        // so we know these values never change while the game is running.
+        const PADDLE_W = 12;   // How wide each paddle is (in pixels)
+        const PADDLE_H = 90;          // How tall each paddle is
+        const PADDLE_SPEED = 6;        // How fast paddles move when you press a key
+        const BALL_SIZE = 10;          // How big the ball is
+        const BALL_SPEED_INIT = 5;     // How fast the ball moves at the start of a round
+        const BALL_SPEED_MAX = 12;     // The fastest the ball can ever go
+        const WIN_SCORE = 10;          // First player to reach this score wins!
 
-        let aiMode = false;
-        let modeSelected = false;
-        let gameOver = false;
-        let paused = false;
-        let colorPickerOpen = false;
-        let settingsOpen = false;
-        let musicEnabled = true;
-        let bgEnabled = true;
-        let paddle1Color = '#fff';
-        let paddle2Color = '#fff';
+        // ---- GAME STATE VARIABLES ----
+        // These keep track of what's happening in the game right now.
+        // They can change while the game is running (that's why we use "let" not "const").
+        let aiMode = false;            // Are we playing against the computer?
+        let modeSelected = false;      // Has the player picked a game mode yet?
+        let gameOver = false;          // Is the game finished?
+        let paused = false;            // Is the game paused?
+        let colorPickerOpen = false;   // Is the color picker showing?
+        let settingsOpen = false;      // Is the settings menu showing?
+        let musicEnabled = true;       // Should we play sound effects?
+        let bgEnabled = true;          // Should we show the starry background?
+        let paddle1Color = '#fff';     // Player 1's paddle color (starts as white)
+        let paddle2Color = '#fff';     // Player 2's paddle color (starts as white)
 
-        // Countdown state
+        // ---- COUNTDOWN ----
+        // Before each round starts, there's a 3-2-1 countdown
         let countingDown = false;
         let countdownStart = 0;
         const COUNTDOWN_DURATION = 3000; // 3 seconds
 
-        // Game over sequence
+        // ---- GAME OVER ANIMATION ----
+        // When someone wins, we show "Game Over!" fading away, then the winner's name
         let gameOverPhase = 0; // 0 = not over, 1 = "Game Over!" fading, 2 = show result
         let gameOverStart = 0;
         const GAME_OVER_FADE_DURATION = 2000; // 2 seconds for "Game Over!" to fade
 
-        // Explosion state
+        // ---- EXPLOSION EFFECT ----
+        // When someone scores, the ball explodes into colorful particles!
         let exploding = false;
         let explosionParticles = [];
         let explosionStart = 0;
         const EXPLOSION_DURATION = 1000; // 1 second
-        let waitingToStart = true;
-        let startingPlayer = 0;
-        let roundStartTime = 0;
-        const ROUND_TIME_LIMIT = 60000; // 1 minute in ms
+        let waitingToStart = true;     // Are we waiting for someone to press Enter?
+        let startingPlayer = 0;        // Which player gets the ball first (1 or 2)?
+        let roundStartTime = 0;        // When the current round started
+        const ROUND_TIME_LIMIT = 60000; // If a round lasts longer than 60 seconds, it ends automatically
 
-        const SLOW_COOLDOWN = 5000; // 5 seconds
-        const SLOW_DURATION = 5000; // slow lasts 5 seconds
+        // ---- SLOW POWER-UP ----
+        // In AI mode, the player can press Shift to slow down the AI for 5 seconds.
+        // But you have to wait 5 seconds between uses (that's the "cooldown").
+        const SLOW_COOLDOWN = 5000;
+        const SLOW_DURATION = 5000;
         let slowCooldownStart = 0;
         let aiSlowed = false;
         let aiSlowedUntil = 0;
 
-        const PLAYER_SLOW_DELAY = 10000; // 10 seconds into round
+        // After 10 seconds in a round, the player also gets slowed down to keep things fair!
+        const PLAYER_SLOW_DELAY = 10000;
         let playerSlowed = false;
         let playerSlowedUntil = 0;
 
-        // Stars for space background
+        // ---- STARS ----
+        // We create 150 random stars for the space background.
+        // Each star has a position, size, brightness, and twinkle speed.
         const stars = [];
         for (let i = 0; i < 150; i++) {
             stars.push({
@@ -316,19 +444,33 @@
             });
         }
 
-        const TRAIL_MAX = 20;
+        // ---- BALL TRAIL ----
+        // The ball leaves a fiery trail behind it. We store the last 40 positions.
+        const TRAIL_MAX = 40;
         const trail = [];
 
+        // ---- PADDLES AND BALL ----
+        // Each paddle has a position (x, y), size (w, h), and a score.
+        // Paddle 1 is on the left, Paddle 2 is on the right.
         const paddle1 = { x: 20, y: H / 2 - PADDLE_H / 2, w: PADDLE_W, h: PADDLE_H, score: 0 };
         const paddle2 = { x: W - 20 - PADDLE_W, y: H / 2 - PADDLE_H / 2, w: PADDLE_W, h: PADDLE_H, score: 0 };
 
+        // The ball has a position (x, y) and velocity (vx = sideways speed, vy = up/down speed)
         const ball = { x: 0, y: 0, vx: 0, vy: 0 };
 
+        // ---- KEYBOARD TRACKING ----
+        // This object remembers which keys are currently held down.
+        // When you press "w", keys['w'] becomes true. When you let go, it becomes false.
         const keys = {};
         function clearKeys() { Object.keys(keys).forEach(k => keys[k] = false); }
 
-        // Audio
+        // ---- SOUND EFFECTS ----
+        // We use the Web Audio API to create sounds from scratch (no sound files needed!).
+        // It works by creating "oscillators" -- things that vibrate at different speeds
+        // to make different musical notes. Fast vibrations = high pitch, slow = low pitch.
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // This plays a "pew pew" laser sound when the ball hits a paddle
         function playLaserSound() {
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
@@ -343,6 +485,7 @@
             osc.stop(audioCtx.currentTime + 0.15);
         }
 
+        // A deep dramatic boom when the game ends
         function playGameOverSound() {
             const t = audioCtx.currentTime;
             // Deep boom
@@ -371,6 +514,7 @@
             osc2.stop(t + 1.0);
         }
 
+        // A happy rising melody when you win!
         function playVictorySound() {
             const t = audioCtx.currentTime;
             const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
@@ -389,6 +533,7 @@
             });
         }
 
+        // A sad falling melody when you lose :(
         function playSadSound() {
             const t = audioCtx.currentTime;
             const notes = [400, 350, 300, 200]; // descending sad tones
@@ -407,6 +552,9 @@
             });
         }
 
+        // ---- EXPLOSION ----
+        // Creates 40 tiny particles flying in random directions from where the ball was.
+        // Each particle gets a random angle (direction) and speed.
         function startExplosion(x, y, callback) {
             exploding = true;
             explosionStart = Date.now();
@@ -427,6 +575,9 @@
         }
         let explosionCallback = null;
 
+        // ---- RESET BALL ----
+        // Put the ball back in the center and launch it in the given direction.
+        // "direction" is 1 (go right) or -1 (go left).
         function resetBall(direction) {
             clearKeys();
             trail.length = 0;
@@ -436,12 +587,16 @@
             playerSlowed = false;
             ball.x = W / 2;
             ball.y = H / 2;
-            const angle = (Math.random() * Math.PI / 3) - Math.PI / 6; // -30 to +30 deg
+            // Pick a random angle between -30 and +30 degrees so the ball
+            // doesn't always go perfectly straight. We use cos (left-right part)
+            // and sin (up-down part) to turn an angle into a direction.
+            const angle = (Math.random() * Math.PI / 3) - Math.PI / 6;
             const speed = BALL_SPEED_INIT;
             ball.vx = Math.cos(angle) * speed * direction;
             ball.vy = Math.sin(angle) * speed;
         }
 
+        // Set up the "waiting to start" state -- ball sits still near the starting player
         function setupWaitingState() {
             startingPlayer = aiMode ? 1 : (Math.random() < 0.5 ? 1 : 2);
             waitingToStart = true;
@@ -458,6 +613,7 @@
             }
         }
 
+        // Reset everything back to the beginning -- scores go to 0, paddles go to the middle
         function resetGame() {
             clearKeys();
             paddle1.score = 0;
@@ -478,11 +634,20 @@
             setupWaitingState();
         }
 
+        // "Clamp" keeps a number between a minimum and maximum value.
+        // For example, clamp(150, 0, 100) returns 100 -- it won't let it go above 100.
+        // We use this to stop paddles from going off the screen.
         function clamp(val, min, max) {
             return Math.max(min, Math.min(max, val));
         }
 
+        // ===========================================================
+        // UPDATE FUNCTION -- runs every frame to move things around
+        // This is the "brain" of the game. It moves paddles, moves
+        // the ball, checks for collisions, and keeps score.
+        // ===========================================================
         function update() {
+            // If the game is over, paused, or a menu is open, don't update anything
             if (gameOver || paused || waitingToStart || colorPickerOpen || settingsOpen) return;
 
             // Update explosion
@@ -514,13 +679,25 @@
                 playerSlowed = false;
             }
 
-            // Player 1 movement (W/S)
+            // ---- PLAYER 1 MOVEMENT ----
+            // Move paddle 1 up/down based on W/S keys or touch input.
+            // If the player is "slowed", they move at 67% of normal speed.
             const p1Speed = PADDLE_SPEED * (playerSlowed ? 0.67 : 1);
+            if (touchP1TargetY !== null) {
+                const diff = touchP1TargetY - paddle1.y;
+                if (Math.abs(diff) > p1Speed) {
+                    paddle1.y += Math.sign(diff) * p1Speed;
+                } else {
+                    paddle1.y = touchP1TargetY;
+                }
+            }
             if (keys['w']) paddle1.y -= p1Speed;
             if (keys['s']) paddle1.y += p1Speed;
             paddle1.y = clamp(paddle1.y, 0, H - PADDLE_H);
 
-            // Player 2 / AI movement
+            // ---- PLAYER 2 / AI MOVEMENT ----
+            // If playing against the computer, the AI tries to follow the ball.
+            // If playing with a friend, Player 2 uses arrow keys or touch.
             if (aiMode) {
                 // Check if slow has expired
                 if (aiSlowed && Date.now() >= aiSlowedUntil) {
@@ -533,6 +710,14 @@
                     paddle2.y += Math.sign(diff) * aiSpeed;
                 }
             } else {
+                if (touchP2TargetY !== null) {
+                    const diff2 = touchP2TargetY - paddle2.y;
+                    if (Math.abs(diff2) > PADDLE_SPEED) {
+                        paddle2.y += Math.sign(diff2) * PADDLE_SPEED;
+                    } else {
+                        paddle2.y = touchP2TargetY;
+                    }
+                }
                 if (keys['arrowup']) paddle2.y -= PADDLE_SPEED;
                 if (keys['arrowdown']) paddle2.y += PADDLE_SPEED;
             }
@@ -556,14 +741,23 @@
                 ball.vy = -Math.abs(ball.vy);
             }
 
-            // Paddle 1 collision
+            // ---- PADDLE 1 COLLISION ----
+            // Check if the ball is touching paddle 1 (left side).
+            // We check: is the ball moving left? Is it overlapping the paddle?
             if (ball.vx < 0 &&
                 ball.x - BALL_SIZE / 2 <= paddle1.x + paddle1.w &&
                 ball.x + BALL_SIZE / 2 >= paddle1.x &&
                 ball.y >= paddle1.y &&
                 ball.y <= paddle1.y + paddle1.h) {
+                // "hit" measures WHERE on the paddle the ball hit.
+                // 0 = dead center, -1 = top edge, +1 = bottom edge.
+                // This lets you aim: hit near the edge to send it at a steep angle!
                 const hit = (ball.y - (paddle1.y + paddle1.h / 2)) / (paddle1.h / 2);
+                // Turn the hit position into an angle (up to 45 degrees up or down)
                 const angle = hit * (Math.PI / 4);
+                // Figure out the current speed using the Pythagorean theorem:
+                // speed = square root of (sideways speed squared + up/down speed squared)
+                // Then add 0.7 to make it a tiny bit faster each hit!
                 const speed = clamp(Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) + 0.7, BALL_SPEED_INIT, BALL_SPEED_MAX);
                 ball.vx = Math.cos(angle) * speed;
                 ball.vy = Math.sin(angle) * speed;
@@ -571,7 +765,9 @@
                 if (musicEnabled) playLaserSound();
             }
 
-            // Paddle 2 collision
+            // ---- PADDLE 2 COLLISION ----
+            // Same idea as paddle 1, but for the right paddle.
+            // The ball bounces to the LEFT (negative direction) instead.
             if (ball.vx > 0 &&
                 ball.x + BALL_SIZE / 2 >= paddle2.x &&
                 ball.x - BALL_SIZE / 2 <= paddle2.x + paddle2.w &&
@@ -603,7 +799,9 @@
                 return;
             }
 
-            // Scoring
+            // ---- SCORING ----
+            // If the ball goes past the left edge, Player 2 scores.
+            // If the ball goes past the right edge, Player 1 scores.
             if (ball.x < 0) {
                 paddle2.score++;
                 score2El.textContent = paddle2.score;
@@ -626,12 +824,17 @@
             }
         }
 
+        // ===========================================================
+        // DRAW FUNCTION -- runs every frame to paint the screen
+        // This is the "artist" of the game. It draws everything you
+        // see: background, stars, paddles, ball, trail, and text.
+        // ===========================================================
         function draw() {
-            // Background
+            // Paint over everything with a dark background color (like erasing a whiteboard)
             ctx.fillStyle = bgEnabled ? '#050510' : '#111';
             ctx.fillRect(0, 0, W, H);
 
-            // Stars
+            // Draw twinkling stars using Math.sin to make them fade in and out smoothly
             if (bgEnabled) {
                 const now = Date.now();
                 for (const s of stars) {
@@ -659,12 +862,17 @@
             ctx.fillStyle = paddle2Color;
             ctx.fillRect(paddle2.x, paddle2.y, paddle2.w, paddle2.h);
 
-            // Check ball speed stage
+            // ---- BALL APPEARANCE ----
+            // The ball changes how it looks based on speed!
+            // Slow = normal fireball, medium = icy blue comet, fast = fiery meteor
+            // We use Pythagorean theorem again to calculate total speed from vx and vy
             const ballSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
             const isMeteor = ballSpeed >= BALL_SPEED_MAX - 0.5;
             const isComet = !isMeteor && ballSpeed >= (BALL_SPEED_INIT + BALL_SPEED_MAX) / 2;
 
-            // Fire trail
+            // ---- FIRE TRAIL ----
+            // Draw circles at each of the ball's recent positions.
+            // Older positions are smaller and more transparent (fading away).
             for (let i = 0; i < trail.length; i++) {
                 const t = i / trail.length; // 0 = oldest, 1 = newest
                 if (isMeteor) {
@@ -783,39 +991,36 @@
                 ctx.globalAlpha = 1;
             }
 
-            // Slow ability timer (AI mode only)
+            // ---- SLOW BUTTON (on canvas) ----
+            // In AI mode, draw a button in the corner that lets you slow down the AI
             if (aiMode && !waitingToStart && !gameOver) {
+                const sbx = 10, sby = H - 45, sbw = 80, sbh = 35, sbr = 8;
                 const elapsed = Date.now() - slowCooldownStart;
+                let sbColor, sbText;
                 if (aiSlowed) {
-                    slowTimerEl.style.color = '#ff6666';
-                    slowTimerEl.textContent = 'SLOWED';
+                    sbColor = '#ff8800'; sbText = 'ACTIVE';
                 } else if (elapsed >= SLOW_COOLDOWN) {
-                    slowTimerEl.style.color = '#00ff00';
-                    slowTimerEl.textContent = 'READY';
+                    sbColor = '#4caf50'; sbText = 'SLOW';
                 } else {
-                    const remaining = Math.ceil((SLOW_COOLDOWN - elapsed) / 1000);
-                    slowTimerEl.style.color = '#888';
-                    slowTimerEl.textContent = remaining + 's';
+                    sbColor = '#555'; sbText = Math.ceil((SLOW_COOLDOWN - elapsed) / 1000) + 's';
                 }
-            } else {
-                slowTimerEl.textContent = '';
-            }
-
-            // Player slow timer (AI mode only)
-            if (aiMode && !waitingToStart && !gameOver) {
-                const roundElapsed = Date.now() - roundStartTime;
-                if (playerSlowed) {
-                    playerSlowTimerEl.style.color = '#ff6666';
-                    playerSlowTimerEl.textContent = 'SLOWED';
-                } else if (roundElapsed >= PLAYER_SLOW_DELAY) {
-                    playerSlowTimerEl.textContent = '';
-                } else {
-                    const remaining = Math.ceil((PLAYER_SLOW_DELAY - roundElapsed) / 1000);
-                    playerSlowTimerEl.style.color = '#888';
-                    playerSlowTimerEl.textContent = remaining + 's';
-                }
-            } else {
-                playerSlowTimerEl.textContent = '';
+                ctx.beginPath();
+                ctx.moveTo(sbx + sbr, sby);
+                ctx.lineTo(sbx + sbw - sbr, sby);
+                ctx.quadraticCurveTo(sbx + sbw, sby, sbx + sbw, sby + sbr);
+                ctx.lineTo(sbx + sbw, sby + sbh - sbr);
+                ctx.quadraticCurveTo(sbx + sbw, sby + sbh, sbx + sbw - sbr, sby + sbh);
+                ctx.lineTo(sbx + sbr, sby + sbh);
+                ctx.quadraticCurveTo(sbx, sby + sbh, sbx, sby + sbh - sbr);
+                ctx.lineTo(sbx, sby + sbr);
+                ctx.quadraticCurveTo(sbx, sby, sbx + sbr, sby);
+                ctx.closePath();
+                ctx.fillStyle = sbColor;
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = '16px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(sbText, sbx + sbw / 2, sby + sbh / 2 + 6);
             }
 
             // Pause overlay
@@ -904,13 +1109,23 @@
             }
         }
 
+        // ===========================================================
+        // GAME LOOP -- the heartbeat of the game!
+        // This function calls update() and draw() over and over,
+        // about 60 times per second. That's what makes it feel
+        // smooth and animated, like a flip-book!
+        // ===========================================================
         function gameLoop() {
             update();
             draw();
-            requestAnimationFrame(gameLoop);
+            requestAnimationFrame(gameLoop); // Ask the browser to call us again soon
         }
 
-        // Input
+        // ===========================================================
+        // KEYBOARD INPUT
+        // "keydown" fires when you press a key, "keyup" when you let go.
+        // We use these to control paddles, start the game, pause, etc.
+        // ===========================================================
         window.addEventListener('keydown', e => {
             if (!modeSelected) {
                 if (e.key === 'b' || e.key === 'B') {
@@ -1002,10 +1217,13 @@
                 e.preventDefault();
             }
         });
+        // When a key is released, mark it as not pressed
         window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+        // If the player clicks away from the game window, release all keys
         window.addEventListener('blur', clearKeys);
 
-        // Mode select
+        // ---- MODE SELECT ----
+        // When you click "1 Player and AI" or "2 Players", this runs
         function selectMode(isAi) {
             aiMode = isAi;
             modeSelected = true;
@@ -1026,7 +1244,145 @@
             bgToggle.classList.toggle('on', bgEnabled);
         });
 
-        // Start
+        // ===========================================================
+        // TOUCH CONTROLS (for phones and tablets)
+        // On a touchscreen, you drag your finger on the left side
+        // of the canvas to move Player 1's paddle, and on the right
+        // side for Player 2. The paddle smoothly follows your finger.
+        // ===========================================================
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        // We track each finger's "target Y position" so the paddle moves smoothly toward it
+        let touchP1Id = null;
+        let touchP2Id = null;
+        let touchP1TargetY = null;
+        let touchP2TargetY = null;
+
+        // Convert a finger's screen position to a position on the game canvas
+        function getTouchPos(touch) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (touch.clientX - rect.left) * (W / rect.width),
+                y: (touch.clientY - rect.top) * (H / rect.height)
+            };
+        }
+
+        // Slow button hit test (canvas coordinates)
+        const SLOW_BTN = { x: 10, y: H - 45, w: 80, h: 35 };
+        function isInsideSlowBtn(cx, cy) {
+            return cx >= SLOW_BTN.x && cx <= SLOW_BTN.x + SLOW_BTN.w &&
+                   cy >= SLOW_BTN.y && cy <= SLOW_BTN.y + SLOW_BTN.h;
+        }
+
+        canvas.addEventListener('touchstart', e => {
+            e.preventDefault();
+            if (!modeSelected || colorPickerOpen || settingsOpen) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            for (const touch of e.changedTouches) {
+                const pos = getTouchPos(touch);
+                // Check slow button tap
+                if (aiMode && isInsideSlowBtn(pos.x, pos.y)) {
+                    if (!waitingToStart && !gameOver && !paused) {
+                        const elapsed = Date.now() - slowCooldownStart;
+                        if (elapsed >= SLOW_COOLDOWN && !aiSlowed) {
+                            aiSlowed = true;
+                            aiSlowedUntil = Date.now() + SLOW_DURATION;
+                            slowCooldownStart = Date.now();
+                        }
+                    }
+                    continue;
+                }
+                if (pos.x < W / 2) {
+                    // Left side - Player 1
+                    touchP1Id = touch.identifier;
+                    touchP1TargetY = clamp(pos.y - PADDLE_H / 2, 0, H - PADDLE_H);
+                } else if (!aiMode) {
+                    // Right side - Player 2 (only in 2P mode)
+                    touchP2Id = touch.identifier;
+                    touchP2TargetY = clamp(pos.y - PADDLE_H / 2, 0, H - PADDLE_H);
+                }
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchmove', e => {
+            e.preventDefault();
+            for (const touch of e.changedTouches) {
+                const pos = getTouchPos(touch);
+                if (touch.identifier === touchP1Id) {
+                    touchP1TargetY = clamp(pos.y - PADDLE_H / 2, 0, H - PADDLE_H);
+                } else if (touch.identifier === touchP2Id && !aiMode) {
+                    touchP2TargetY = clamp(pos.y - PADDLE_H / 2, 0, H - PADDLE_H);
+                }
+            }
+        }, { passive: false });
+
+        canvas.addEventListener('touchend', e => {
+            for (const touch of e.changedTouches) {
+                if (touch.identifier === touchP1Id) { touchP1Id = null; touchP1TargetY = null; }
+                if (touch.identifier === touchP2Id) { touchP2Id = null; touchP2TargetY = null; }
+            }
+        });
+
+        // ---- TOUCH BUTTON HANDLERS ----
+        // These connect the on-screen buttons (Start, Pause, Reset, Settings) to game actions
+        const touchEnterBtn = document.getElementById('touch-enter');
+        const touchPauseBtn = document.getElementById('touch-pause');
+        const touchResetBtn = document.getElementById('touch-reset');
+        const touchSettingsBtn = document.getElementById('touch-settings');
+
+        touchEnterBtn.addEventListener('click', () => {
+            // Resume audio context on first touch interaction
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (settingsOpen) {
+                settingsOpen = false;
+                paused = false;
+                settingsEl.style.display = 'none';
+                clearKeys();
+            } else if (colorPickerOpen) {
+                const c1 = p1ColorInput.value.trim();
+                const c2 = p2ColorInput.value.trim();
+                if (c1) paddle1Color = c1;
+                if (c2) paddle2Color = c2;
+                colorPickerOpen = false;
+                paused = false;
+                colorPickerEl.style.display = 'none';
+                clearKeys();
+            } else if (waitingToStart && !countingDown) {
+                countingDown = true;
+                countdownStart = Date.now();
+            } else if (gameOver) {
+                resetGame();
+            }
+        });
+
+        touchPauseBtn.addEventListener('click', () => {
+            if (!waitingToStart && !gameOver && !colorPickerOpen && !settingsOpen) {
+                paused = !paused;
+                if (!paused) clearKeys();
+            }
+        });
+
+        touchResetBtn.addEventListener('click', () => {
+            resetGame();
+        });
+
+        touchSettingsBtn.addEventListener('click', () => {
+            if (!settingsOpen && !colorPickerOpen) {
+                settingsOpen = true;
+                paused = true;
+                settingsEl.style.display = 'block';
+                clearKeys();
+            } else if (settingsOpen) {
+                settingsOpen = false;
+                paused = false;
+                settingsEl.style.display = 'none';
+                clearKeys();
+            }
+        });
+
+        // ---- KICK EVERYTHING OFF! ----
+        // Set up the initial "waiting to start" state and begin the game loop.
+        // From here, gameLoop() keeps running forever, drawing and updating 60x per second.
         setupWaitingState();
         gameLoop();
     </script>
