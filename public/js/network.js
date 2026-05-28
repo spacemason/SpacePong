@@ -176,8 +176,12 @@ var Network = (function () {
     function connect(name) {
         return new Promise(function (resolve, reject) {
             try {
-                // io() creates the Socket.IO connection to the server
-                socket = io();
+                // io() creates the Socket.IO connection to the server.
+                // We derive the socket.io path from the current page URL so it
+                // works whether the app is served at the root ("/") or behind
+                // a mount prefix like "/spacepong/".
+                var dir = window.location.pathname.replace(/[^/]*$/, '');
+                socket = io({ path: dir + 'socket.io/' });
                 username = name;
 
                 // When the connection is established, say hello!
