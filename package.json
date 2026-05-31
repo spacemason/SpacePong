@@ -19,6 +19,7 @@
     "title": "Space Pong",
     "description": "Multiplayer Pong with online lobbies, challenges, spectating, and a leaderboard.",
     "start": "node server/server.js",
-    "healthPath": "/"
+    "healthPath": "/",
+    "image": "cover.png"
   }
 }
