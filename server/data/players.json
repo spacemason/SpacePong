@@ -24,5 +24,11 @@
     "wins": 0,
     "losses": 0,
     "gamesPlayed": 0
+  },
+  "ClickerMonkey": {
+    "username": "ClickerMonkey",
+    "wins": 0,
+    "losses": 0,
+    "gamesPlayed": 0
   }
 }
