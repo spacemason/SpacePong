@@ -155,7 +155,31 @@ var OnlineGame = (function () {
     }
 
     function updateTouchInput() {
-        if (touchTargetY === null || !active || playerNumber === 0) return;
+        if (!active || playerNumber === 0) return;
+
+        // --- Hub input system: gamepad + on-screen joystick (additive) ---
+        // hub.input.axis('paddle') is -1..1 (negative = up, positive = down).
+        // It folds in gamepad/touch-stick movement on top of the existing
+        // keyboard handlers, which keep working untouched. Only acts when there
+        // isn't already a canvas drag (touchTargetY) in progress, so the two
+        // touch styles never fight.
+        if (touchTargetY === null && window.HubPaddle && window.HubPaddle.ready) {
+            var paddleAxis = window.HubPaddle.axis();
+            var deadZone = 0.3;
+            var hubUp = paddleAxis < -deadZone;
+            var hubDown = paddleAxis > deadZone;
+            // The hub axis already includes the keyboard (paddleUp/paddleDown
+            // map w/s + arrows), so it is the single source of truth here for
+            // the up/down state — set true while a direction is held (key,
+            // gamepad stick/d-pad, or on-screen joystick) and false otherwise.
+            var changedH = false;
+            if (localInput.up !== hubUp) { localInput.up = hubUp; changedH = true; }
+            if (localInput.down !== hubDown) { localInput.down = hubDown; changedH = true; }
+            if (changedH) sendInputIfChanged();
+            return;
+        }
+
+        if (touchTargetY === null) return;
         // Compare touch target to our current local predicted paddle position
         var currentY = localPaddleY;
         var threshold = 2; // dead zone in canvas pixels
@@ -297,7 +321,11 @@ var OnlineGame = (function () {
         canvas.addEventListener('touchend', onOnlineCanvasTouchEnd, { passive: false });
         canvas.addEventListener('touchcancel', onOnlineCanvasTouchEnd, { passive: false });
 
-        // Poll touch target vs paddle position at ~60Hz to send appropriate up/down inputs
+        // Enable the hub input group for the match (gamepad + on-screen
+        // joystick paddle control). No-op if the hub client isn't loaded.
+        if (window.HubPaddle) window.HubPaddle.enable();
+
+        // Poll touch target / hub paddle axis at ~60Hz to send up/down inputs
         touchInputInterval = setInterval(updateTouchInput, 16);
 
         var touchEnterBtn = document.getElementById('touch-enter');
@@ -320,6 +348,10 @@ var OnlineGame = (function () {
      */
     function stop() {
         active = false;
+
+        // Disable the hub input group when leaving the match (hides the
+        // on-screen joystick). No-op if the hub client isn't loaded.
+        if (window.HubPaddle) window.HubPaddle.disable();
 
         if (animFrameId !== null) {
             cancelAnimationFrame(animFrameId);
