@@ -59,6 +59,20 @@ import('/_hub/hub.js').then(function (mod) {
             try { return hub.input.axis('paddle'); } catch (e) { return 0; }
         },
     };
+
+    // Make the client's own menus / lobby / modals gamepad-navigable. While any
+    // matching button is visible AND a gamepad is the active device, the
+    // d-pad/stick move a highlight ring across them and A clicks the focused
+    // one. It re-queries every frame (so it follows screens showing/hiding) and
+    // is a no-op for mouse/touch/keyboard, so it doesn't affect existing input
+    // or in-game paddle control. Selector covers the main mode-select menu, the
+    // username + color modals, and every lobby action / challenge modal (all of
+    // which carry the .lobby-btn class).
+    try {
+        hub.input.autoNavigate(
+            '#mode-select .mode-btn, #username-modal .mode-btn, #online-color-modal .mode-btn, .lobby-btn'
+        );
+    } catch (e) {}
 }).catch(function () {
     // Hub client not available (running without the host). Keep the no-op
     // surface — existing keyboard/touch controls remain fully functional.
