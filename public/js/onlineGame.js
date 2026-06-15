@@ -85,9 +85,12 @@ var OnlineGame = (function () {
     }
 
     // --- Touch controls (for phones and tablets) ---
-    // Same idea as local game — drag your finger to move your paddle.
-    // But instead of moving the paddle directly, we figure out if you
-    // want to go up or down and SEND that to the server.
+    // Touch-to-target: tap or drag anywhere on the play surface and the paddle
+    // moves toward the Y you touched — "point where you want the paddle." We
+    // map touch.clientY into canvas/game coords (via the canvas rect) to get a
+    // target Y, then each frame nudge toward it by telling the (authoritative)
+    // server to move up or down until the paddle reaches that target. This
+    // replaces the old draggable on-screen joystick.
 
     function touchToCanvasOnline(touch) {
         var rect = canvas.getBoundingClientRect();
@@ -157,12 +160,13 @@ var OnlineGame = (function () {
     function updateTouchInput() {
         if (!active || playerNumber === 0) return;
 
-        // --- Hub input system: gamepad + on-screen joystick (additive) ---
+        // --- Hub input system: keyboard + gamepad (additive) ---
         // hub.input.axis('paddle') is -1..1 (negative = up, positive = down).
-        // It folds in gamepad/touch-stick movement on top of the existing
-        // keyboard handlers, which keep working untouched. Only acts when there
-        // isn't already a canvas drag (touchTargetY) in progress, so the two
-        // touch styles never fight.
+        // It folds in gamepad (left stick / d-pad) movement together with the
+        // keyboard (w/s + arrows). Only acts when there isn't a touch-to-target
+        // (touchTargetY) in progress, so touch and key/pad never fight.
+        // (There is deliberately no on-screen joystick — touch uses the
+        // tap/drag-to-target handlers below instead.)
         if (touchTargetY === null && window.HubPaddle && window.HubPaddle.ready) {
             var paddleAxis = window.HubPaddle.axis();
             var deadZone = 0.3;
@@ -170,8 +174,8 @@ var OnlineGame = (function () {
             var hubDown = paddleAxis > deadZone;
             // The hub axis already includes the keyboard (paddleUp/paddleDown
             // map w/s + arrows), so it is the single source of truth here for
-            // the up/down state — set true while a direction is held (key,
-            // gamepad stick/d-pad, or on-screen joystick) and false otherwise.
+            // the up/down state — set true while a direction is held (key or
+            // gamepad stick/d-pad) and false otherwise.
             var changedH = false;
             if (localInput.up !== hubUp) { localInput.up = hubUp; changedH = true; }
             if (localInput.down !== hubDown) { localInput.down = hubDown; changedH = true; }
@@ -321,8 +325,9 @@ var OnlineGame = (function () {
         canvas.addEventListener('touchend', onOnlineCanvasTouchEnd, { passive: false });
         canvas.addEventListener('touchcancel', onOnlineCanvasTouchEnd, { passive: false });
 
-        // Enable the hub input group for the match (gamepad + on-screen
-        // joystick paddle control). No-op if the hub client isn't loaded.
+        // Enable the hub input group for the match (keyboard + gamepad paddle
+        // control; touch is handled directly via touch-to-target above).
+        // No-op if the hub client isn't loaded.
         if (window.HubPaddle) window.HubPaddle.enable();
 
         // Poll touch target / hub paddle axis at ~60Hz to send up/down inputs
@@ -349,8 +354,9 @@ var OnlineGame = (function () {
     function stop() {
         active = false;
 
-        // Disable the hub input group when leaving the match (hides the
-        // on-screen joystick). No-op if the hub client isn't loaded.
+        // Disable the hub input group when leaving the match (releases the
+        // keyboard + gamepad paddle bindings). No-op if the hub client isn't
+        // loaded.
         if (window.HubPaddle) window.HubPaddle.disable();
 
         if (animFrameId !== null) {

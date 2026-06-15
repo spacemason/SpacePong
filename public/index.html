@@ -128,8 +128,9 @@
     <script src="js/lobbyUI.js"></script>    <!-- Builds the online lobby screen -->
     <script src="js/localGame.js"></script>  <!-- Runs the local (same keyboard) game -->
     <script src="js/onlineGame.js"></script> <!-- Runs the online game -->
-    <!-- diffenderfer.games shared input system: adds gamepad + touch-stick
-         paddle control on top of the existing keyboard/touch handling. -->
+    <!-- diffenderfer.games shared input system: adds gamepad paddle control on
+         top of the existing keyboard handling. Touch uses the game's own
+         touch-to-target handlers (no on-screen joystick). -->
     <script type="module" src="js/hubInput.js"></script>
     <script src="js/main.js"></script>       <!-- The traffic controller — loaded last! -->
 </body>

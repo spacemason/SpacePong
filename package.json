@@ -17,7 +17,7 @@
     "type": "process",
     "author": "Mason",
     "title": "Space Pong",
-    "menuPosition": "bottom-right",
+    "menuPosition": "top-left",
     "description": "Multiplayer Pong with online lobbies, challenges, spectating, and a leaderboard.",
     "start": "node server/server.js",
     "healthPath": "/",
